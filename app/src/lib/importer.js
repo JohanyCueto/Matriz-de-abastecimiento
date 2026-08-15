@@ -120,7 +120,7 @@ export async function importarExcel(file, onStep) {
 
   onStep?.('Revisando lo que ya tienes guardado...')
   const existentesProg = await fetchAll('programacion_oc',
-    'id_entrega,estado_gestion,motivo_demora,responsable_accion,criticidad,observaciones,cierre_manual,motivo_cierre,reabierta,historial')
+    'id_entrega,fecha_programada_ingreso,estado_gestion,motivo_demora,responsable_accion,criticidad,observaciones,cierre_manual,motivo_cierre,reabierta,historial')
   const existentesPorId = new Map(existentesProg.map(r => [r.id_entrega, r]))
 
   const existentesIng = await fetchAll('ingresos_sistema', 'numero_analisis,oc,codigo,cantidad_ingresada,fecha_ingreso')
@@ -137,6 +137,10 @@ export async function importarExcel(file, onStep) {
     return {
       ...base,
       ...editable,
+      // Una vez que la fila existe, la fecha programada solo cambia
+      // reprogramando desde la app (que deja historial). Si no, una
+      // resubida del Excel podria pisar una reprogramacion ya hecha.
+      fecha_programada_ingreso: prev ? prev.fecha_programada_ingreso : base.fecha_programada_ingreso,
       reabierta: prev ? prev.reabierta : false,
       historial: prev ? prev.historial : [],
     }

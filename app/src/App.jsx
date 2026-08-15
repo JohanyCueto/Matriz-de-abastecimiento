@@ -3,6 +3,7 @@ import { supabase } from './lib/supabaseClient'
 import { fmt, fdate, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
 import Panel from './Panel'
 import ImportButton from './ImportButton'
+import ExportButton from './ExportButton'
 import './App.css'
 
 const CAT_EST = ['Pendiente', 'Parcial', 'Completo']
@@ -207,6 +208,7 @@ export default function App() {
             <button className={`btn ${soloTol ? 'act' : ''}`} onClick={() => setSoloTol(v => !v)}>Solo tolerancia</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>
             <ImportButton onDone={cargar} />
+            <ExportButton />
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
 

@@ -24,6 +24,10 @@ Excel** de la app (`app/src/lib/importer.js`), y:
   `motivo_demora`, `responsable_accion`, `criticidad`, `observaciones`,
   `cierre_manual`, `motivo_cierre`) **no se pisan** en filas que ya
   existían: esos los maneja la gente desde la app, no el Excel.
+- `fecha_programada_ingreso` también queda protegida una vez que la fila ya
+  existe: solo cambia si alguien reprograma desde la app (que además deja
+  historial). Si no fuera así, resubir un Excel viejo podría borrar una
+  reprogramación ya hecha por el equipo.
 - `ingresos_sistema` solo agrega filas nuevas (dedup por `numero_analisis`),
   nunca se borran ni se pisan las anteriores.
 - Cada importación recalcula `cant_ingresada`, `saldo_pendiente`,
@@ -37,6 +41,12 @@ Excel** de la app (`app/src/lib/importer.js`), y:
 - El Excel de Johany a veces trae la misma entrega duplicada (mismo OC +
   SKU + N° de entrega, cargada desde dos archivos de origen). El importador
   deduplica por `ID entrega` antes de calcular, quedándose con una copia.
+  Lo mismo pasa con `ingresos_sistema`: deduplica por `numero_analisis`.
+- El botón **Exportar Excel** de la app (`app/src/lib/exporter.js`) genera
+  una copia nueva de `programacion_oc` en el mismo formato del Excel
+  original, con los datos y el seguimiento más al día. Es de un solo
+  sentido (base de datos → Excel): el archivo de Johany no se actualiza
+  solo, porque vive en su computadora y no en la nube.
 
 ## Sin login: qué implica
 
