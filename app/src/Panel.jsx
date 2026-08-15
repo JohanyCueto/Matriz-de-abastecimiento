@@ -3,7 +3,8 @@ import { supabase } from './lib/supabaseClient'
 import { fmt, fmtM, fdate, days, SEM, CERRADAS, MOTIVOS, RESP, gestOpts } from './lib/derive'
 
 export default function Panel({ row, onClose, onSaved }) {
-  const [ges, setGes] = useState(row.estado_gestion || gestOpts(row)[0])
+  const opcionesGestion = gestOpts(row)
+  const [ges, setGes] = useState(opcionesGestion.includes(row.estado_gestion) ? row.estado_gestion : opcionesGestion[0])
   const [mot, setMot] = useState(row.motivo_demora || '')
   const [resp, setResp] = useState(row.responsable_accion || '')
   const [fec, setFec] = useState(row.fecha_programada_ingreso || '')
@@ -125,7 +126,7 @@ export default function Panel({ row, onClose, onSaved }) {
                 <div className="fld">
                   <label>Estado de gestion</label>
                   <select value={ges} onChange={e => setGes(e.target.value)}>
-                    {gestOpts(row).map(v => <option key={v} value={v}>{v}</option>)}
+                    {opcionesGestion.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                   <div className="hint">
                     {row.estado_ingreso === 'Completo'

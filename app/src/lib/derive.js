@@ -56,6 +56,7 @@ export function enrich(r) {
   let sem2
   if (tol) sem2 = 'tolerancia'
   else if (!abierto) sem2 = 'cerrado'
+  else if (dd == null) sem2 = 'enfecha'
   else if (dd < 0) sem2 = 'atrasado'
   else if (dd <= 7) sem2 = 'porllegar'
   else sem2 = 'enfecha'

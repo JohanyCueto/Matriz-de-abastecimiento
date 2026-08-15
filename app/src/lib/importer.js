@@ -148,9 +148,12 @@ export async function importarExcel(file, onStep) {
   const entregasUnicas = [...new Map(entregas.map(e => [e.id_entrega, e])).values()]
 
   onStep?.('Sumando los ingresos nuevos...')
-  const ingresosNuevos = rawIng
+  const ingresosNuevosRaw = rawIng
     .map(raw => mapRow(raw, INGRESOS_COLUMNS))
     .filter(e => e.numero_analisis && !numerosExistentes.has(e.numero_analisis))
+  // Igual que con las entregas, el Excel puede traer el mismo ingreso
+  // repetido dos veces si viene de dos archivos de origen distintos.
+  const ingresosNuevos = [...new Map(ingresosNuevosRaw.map(e => [e.numero_analisis, e])).values()]
 
   const eventosPorGrupo = new Map()
   const agregarEvento = (oc, codigo, fecha, cantidad) => {
