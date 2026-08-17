@@ -21,6 +21,15 @@ h1{font-size:20px;font-weight:600;letter-spacing:-.3px}
 .sub{color:var(--ink3);font-size:12.5px;margin-top:3px}
 .corte{text-align:right;font-size:12px;color:var(--ink3)}
 .corte b{display:block;color:var(--ink2);font-weight:500;font-size:13px}
+.usr{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;color:var(--ink2)}
+.usr .btn{padding:4px 10px;font-size:11.5px}
+
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:32px 28px;width:100%;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.06)}
+.login-card h1{font-size:17px;margin-bottom:4px}
+.login-card .sub{margin-bottom:20px}
+.login-card .fld{margin-bottom:14px}
+.login-err{background:var(--redbg);color:var(--red);font-size:12.5px;padding:9px 11px;border-radius:8px;margin-bottom:14px}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:20px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px;cursor:pointer;transition:.14s;position:relative;overflow:hidden}

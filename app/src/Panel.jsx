@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { fmt, fmtM, fdate, days, SEM, CERRADAS, MOTIVOS, RESP, gestOpts } from './lib/derive'
 
-export default function Panel({ row, onClose, onSaved }) {
+export default function Panel({ row, esEditor, onClose, onSaved }) {
   const opcionesGestion = gestOpts(row)
   const [ges, setGes] = useState(opcionesGestion.includes(row.estado_gestion) ? row.estado_gestion : opcionesGestion[0])
   const [mot, setMot] = useState(row.motivo_demora || '')
@@ -109,7 +109,18 @@ export default function Panel({ row, onClose, onSaved }) {
 
           <div className="sec">
             <h3>Gestion de la linea</h3>
-            {cerrada ? (
+            {!esEditor ? (
+              <>
+                <div className="lock">
+                  <div className="lockt">Solo lectura</div>
+                  <div className="lockd">Tu cuenta puede ver el seguimiento, pero no editarlo. Si algo debe cambiar, avisa a compras.</div>
+                </div>
+                <div className="kv"><span>Estado de gestion</span><b>{row.estado_gestion || 'sin definir'}</b></div>
+                <div className="kv"><span>Motivo de demora</span><b>{row.motivo_demora || 'sin motivo'}</b></div>
+                <div className="kv"><span>Responsable</span><b>{row.responsable_accion || 'sin asignar'}</b></div>
+                <div className="kv"><span>Comentario</span><b>{row.observaciones || 'sin comentario'}</b></div>
+              </>
+            ) : cerrada ? (
               <>
                 <div className="lock">
                   <div className="lockt">Linea cerrada{row.tol ? ' dentro de tolerancia' : ''}</div>

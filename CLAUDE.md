@@ -5,13 +5,20 @@ empaque. La usan compras, planeamiento y almacén.
 
 ## Decisiones fijas del proyecto
 
-- **Sin login.** Cualquiera con el link puede leer y editar. Fue decisión
-  explícita de Johany: simplicidad por encima de control de acceso.
+- **Con login, por roles.** Cada persona entra con su correo de Roxfarma y
+  una clave (Supabase Auth). El rol vive en la tabla `perfiles`: `editor`
+  puede ver y editar el seguimiento; `lector` solo puede ver. No hay
+  registro abierto: las cuentas las crea Johany desde el panel de Supabase.
+- **Marcha blanca (agosto 2026).** Por ahora solo Johany Cueto es `editor`.
+  Rosmery Ramirez y Cesar Falconi son `lector`. Ricardo Zegarra (otro
+  comprador) todavía no tiene cuenta: se agrega cuando Johany lo converse
+  con él. No cambiar quién es editor sin que Johany lo pida.
 - **Todo gratis**: Supabase (base de datos) y Vercel (hosting), ambos en su
   capa gratuita.
 - El código de la aplicación vive en `app/` (React + Vite). No usa Tailwind,
   el estilo está en `app/src/App.css`, heredado del prototipo original.
-- El esquema de la base de datos vive en `supabase/schema.sql`.
+- El esquema de la base de datos vive en `supabase/schema.sql`, y las
+  reglas de login y permisos en `supabase/auth.sql`.
 
 ## Cómo se actualizan los datos
 
@@ -48,11 +55,16 @@ Excel** de la app (`app/src/lib/importer.js`), y:
   sentido (base de datos → Excel): el archivo de Johany no se actualiza
   solo, porque vive en su computadora y no en la nube.
 
-## Sin login: qué implica
+## Login y permisos: qué implica
 
-Como no hay autenticación, las reglas de acceso (RLS) de Supabase están
-abiertas a cualquiera (`using (true)`). No agregar login sin conversarlo
-antes con Johany: fue una decisión explícita, no un descuido.
+Las reglas de acceso (RLS) de Supabase exigen sesión iniciada para leer
+`programacion_oc` e `ingresos_sistema`, y exigen rol `editor` (consultando
+la tabla `perfiles`) para insertar o actualizar filas. La app también
+esconde los botones de importar y el formulario de gestión para quien es
+`lector`, pero la protección real está en las reglas de Supabase, no en la
+interfaz. Crear una cuenta nueva es un proceso manual: se crea el usuario
+desde Supabase Authentication → Users, y después se le agrega una fila en
+`perfiles` con su rol.
 
 ## Piezas del arnés que faltan (a propósito)
 

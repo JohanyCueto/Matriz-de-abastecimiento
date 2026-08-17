@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
+import { useSesion } from './lib/auth'
 import { fmt, fdate, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
 import Panel from './Panel'
 import ImportButton from './ImportButton'
 import ExportButton from './ExportButton'
+import Login from './Login'
 import './App.css'
 
 const CAT_EST = ['Pendiente', 'Parcial', 'Completo']
@@ -29,6 +31,7 @@ const COLS = [
 ]
 
 export default function App() {
+  const { sesion, perfil, cargando } = useSesion()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -53,7 +56,7 @@ export default function App() {
     setLoading(false)
   }
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { if (sesion) cargar() }, [sesion])
 
   function actualizarFila(id, patch) {
     setRows(prev => withEntregas(prev.map(r => r.id_entrega === id ? enrich({ ...r, ...patch }) : r).map(r => ({ ...r }))))
@@ -160,6 +163,12 @@ export default function App() {
     }
   }
 
+  if (cargando) return <div className="empty">Cargando...</div>
+  if (!sesion) return <Login />
+  if (!perfil) return <div className="empty">Cargando tu perfil...</div>
+
+  const esEditor = perfil.rol === 'editor'
+
   return (
     <div className="wrap">
       <header>
@@ -168,6 +177,10 @@ export default function App() {
           <div className="sub">Ordenes de compra programadas y su estado real de ingreso a almacen</div>
         </div>
         <div className="corte">
+          <div className="usr">
+            {perfil.nombre} · {esEditor ? 'puede editar' : 'solo ver'}
+            <button className="btn" onClick={() => supabase.auth.signOut()}>Cerrar sesion</button>
+          </div>
           Fecha de corte
           <b>{new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}</b>
         </div>
@@ -207,7 +220,7 @@ export default function App() {
             </select>
             <button className={`btn ${soloTol ? 'act' : ''}`} onClick={() => setSoloTol(v => !v)}>Solo tolerancia</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>
-            <ImportButton onDone={cargar} />
+            {esEditor && <ImportButton onDone={cargar} />}
             <ExportButton />
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
@@ -239,7 +252,7 @@ export default function App() {
       )}
 
       {selected && (
-        <Panel row={selected} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
+        <Panel row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
       )}
     </div>
   )
