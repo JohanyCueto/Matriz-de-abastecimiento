@@ -46,6 +46,7 @@ export async function exportarExcel() {
   // que sigan funcionando si alguien edita a mano un valor en el archivo.
   // Las demas (Estado ingreso, Estado gestion...) dependen de logica que
   // cruza varias filas, asi que se quedan con el valor ya calculado.
+  const B = col('oc'), J = col('sku'), O = col('n_entrega')
   const L = col('precio_unitario'), M = col('cant_programada'), W = col('cant_ingresada')
   const X = col('saldo_pendiente'), Q = col('fecha_programada_ingreso'), AC = col('fecha_real_ingreso')
 
@@ -57,6 +58,7 @@ export async function exportarExcel() {
     }
     const f = ws.addRow(fila)
     const n = i + 2
+    f.getCell(col('id_entrega')).value = { formula: `${B}${n}&"-"&${J}${n}&"-"&${O}${n}` }
     f.getCell(col('valor_entrega')).value = { formula: `${L}${n}*${M}${n}` }
     f.getCell(col('saldo_pendiente')).value = { formula: `${M}${n}-${W}${n}` }
     f.getCell(col('pct_ingreso')).value = { formula: `IF(${M}${n}=0,0,ROUND(${W}${n}/${M}${n}*1000,0)/10)` }
