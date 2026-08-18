@@ -40,8 +40,6 @@ export async function exportarExcel() {
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('ProgramacionOC')
 
-  ws.columns = EXPORT_COLUMNS.map(c => ({ header: c.header, key: c.field, width: 16 }))
-
   // Columnas que son un simple calculo se dejan como formula de Excel, para
   // que sigan funcionando si alguien edita a mano un valor en el archivo.
   // Las demas (Estado ingreso, Estado gestion...) dependen de logica que
@@ -50,22 +48,34 @@ export async function exportarExcel() {
   const L = col('precio_unitario'), M = col('cant_programada'), W = col('cant_ingresada')
   const X = col('saldo_pendiente'), Q = col('fecha_programada_ingreso'), AC = col('fecha_real_ingreso')
 
-  data.forEach((r, i) => {
-    const fila = {}
-    for (const { field, type } of EXPORT_COLUMNS) {
-      const v = r[field]
-      fila[field] = (type === 'date' && v) ? aFecha(v) : v
-    }
-    const f = ws.addRow(fila)
+  const rows = data.map((r, i) => {
     const n = i + 2
-    f.getCell(col('id_entrega')).value = { formula: `${B}${n}&"-"&${J}${n}&"-"&${O}${n}` }
-    f.getCell(col('valor_entrega')).value = { formula: `${L}${n}*${M}${n}` }
-    f.getCell(col('saldo_pendiente')).value = { formula: `${M}${n}-${W}${n}` }
-    f.getCell(col('pct_ingreso')).value = { formula: `IF(${M}${n}=0,0,ROUND(${W}${n}/${M}${n}*1000,0)/10)` }
-    f.getCell(col('dias_atraso')).value = { formula: `IF(${AC}${n}="","",MAX(0,${AC}${n}-${Q}${n}))` }
-    f.getCell(col('valor_ingresado')).value = { formula: `${L}${n}*${W}${n}` }
-    f.getCell(col('valor_pendiente')).value = { formula: `${L}${n}*${X}${n}` }
+    return EXPORT_COLUMNS.map(({ field, type }) => {
+      if (field === 'id_entrega') return { formula: `${B}${n}&"-"&${J}${n}&"-"&${O}${n}` }
+      if (field === 'valor_entrega') return { formula: `${L}${n}*${M}${n}` }
+      if (field === 'saldo_pendiente') return { formula: `${M}${n}-${W}${n}` }
+      if (field === 'pct_ingreso') return { formula: `IF(${M}${n}=0,0,ROUND(${W}${n}/${M}${n}*1000,0)/10)` }
+      if (field === 'dias_atraso') return { formula: `IF(${AC}${n}="","",MAX(0,${AC}${n}-${Q}${n}))` }
+      if (field === 'valor_ingresado') return { formula: `${L}${n}*${W}${n}` }
+      if (field === 'valor_pendiente') return { formula: `${L}${n}*${X}${n}` }
+      const v = r[field]
+      return (type === 'date' && v) ? aFecha(v) : v
+    })
   })
+
+  // Se arma como tabla de Excel de verdad (no solo celdas con filtro), para
+  // que aparezca como tabla al abrirla, igual que el Excel original.
+  ws.addTable({
+    name: 'ProgramacionOC',
+    ref: 'A1',
+    headerRow: true,
+    totalsRow: false,
+    style: { theme: null, showRowStripes: false },
+    columns: EXPORT_COLUMNS.map(c => ({ name: c.header, filterButton: true })),
+    rows,
+  })
+
+  ws.columns.forEach(c => { c.width = 16 })
 
   const headerRow = ws.getRow(1)
   EXPORT_COLUMNS.forEach((c, i) => {
@@ -78,7 +88,6 @@ export async function exportarExcel() {
     if (c.type === 'date') ws.getColumn(i + 1).numFmt = 'dd/mm/yyyy'
   })
 
-  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: EXPORT_COLUMNS.length } }
   ws.views = [{ state: 'frozen', ySplit: 1 }]
 
   const buf = await wb.xlsx.writeBuffer()
