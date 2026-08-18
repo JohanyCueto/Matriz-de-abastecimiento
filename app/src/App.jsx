@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { useSesion } from './lib/auth'
-import { fmt, fdate, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
+import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
 import Panel from './Panel'
 import ImportButton from './ImportButton'
 import ExportButton from './ExportButton'
@@ -42,6 +42,7 @@ export default function App() {
   const [fGes, setFGes] = useState('')
   const [fProv, setFProv] = useState('')
   const [fComp, setFComp] = useState('')
+  const [fMes, setFMes] = useState('')
   const [quick, setQuick] = useState('')
   const [soloTol, setSoloTol] = useState(false)
   const [sortK, setSortK] = useState('sem2')
@@ -64,6 +65,10 @@ export default function App() {
 
   const proveedores = useMemo(() => [...new Set(rows.map(r => r.proveedor).filter(Boolean))].sort(), [rows])
   const compradores = useMemo(() => [...new Set(rows.map(r => r.comprador).filter(Boolean))].sort(), [rows])
+  const meses = useMemo(() => {
+    const claves = [...new Set(rows.map(r => r.fecha_programada_ingreso?.slice(0, 7)).filter(Boolean))].sort()
+    return claves.map(k => ({ valor: k, etiqueta: nombreMes(k) }))
+  }, [rows])
 
   const kpis = useMemo(() => {
     const ab = rows.filter(r => r.abierto)
@@ -96,6 +101,7 @@ export default function App() {
       if (fGes && r.estado_gestion !== fGes) return false
       if (fProv && r.proveedor !== fProv) return false
       if (fComp && r.comprador !== fComp) return false
+      if (fMes && r.fecha_programada_ingreso?.slice(0, 7) !== fMes) return false
       if (quick === 'abierto' && !r.abierto) return false
       if (quick === 'cerrado' && r.abierto) return false
       if (quick === 'atrasado' && r.sem2 !== 'atrasado') return false
@@ -113,7 +119,7 @@ export default function App() {
       return (x > y ? 1 : x < y ? -1 : 0) * sortD
     })
     return out
-  }, [rows, q, fEst, fGes, fProv, fComp, quick, soloTol, sortK, sortD])
+  }, [rows, q, fEst, fGes, fProv, fComp, fMes, quick, soloTol, sortK, sortD])
 
   const selected = filtradas.find(r => r.id_entrega === selectedId) || rows.find(r => r.id_entrega === selectedId)
 
@@ -123,7 +129,7 @@ export default function App() {
   }
 
   function limpiar() {
-    setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp('')
+    setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes('')
     setQuick(''); setSoloTol(false)
   }
 
@@ -217,6 +223,10 @@ export default function App() {
             <select value={fComp} onChange={e => setFComp(e.target.value)}>
               <option value="">Todos los compradores</option>
               {compradores.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <select value={fMes} onChange={e => setFMes(e.target.value)}>
+              <option value="">Todos los meses</option>
+              {meses.map(m => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}
             </select>
             <button className={`btn ${soloTol ? 'act' : ''}`} onClick={() => setSoloTol(v => !v)}>Solo tolerancia</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>

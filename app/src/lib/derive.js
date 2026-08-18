@@ -8,6 +8,13 @@ export const fdate = s => {
   return `${d}/${m}/${y.slice(2)}`
 }
 
+// "2026-09" -> "Septiembre 2026"
+export const nombreMes = clave => {
+  const [y, m] = clave.split('-')
+  const nombre = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('es-PE', { month: 'long' })
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${y}`
+}
+
 export const days = s => s ? Math.round((new Date(s + 'T00:00:00') - new Date()) / 864e5) : null
 
 export const CERRADAS = ['Cerrado']
