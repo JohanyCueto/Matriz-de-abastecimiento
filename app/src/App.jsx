@@ -4,6 +4,7 @@ import { useSesion } from './lib/auth'
 import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
 import Panel from './Panel'
 import ImportButton from './ImportButton'
+import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
 import Login from './Login'
 import './App.css'
@@ -231,6 +232,7 @@ export default function App() {
             <button className={`btn ${soloTol ? 'act' : ''}`} onClick={() => setSoloTol(v => !v)}>Solo tolerancia</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>
             {esEditor && <ImportButton onDone={cargar} />}
+            {esEditor && <ImportIngresosButton onDone={cargar} />}
             <ExportButton />
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>

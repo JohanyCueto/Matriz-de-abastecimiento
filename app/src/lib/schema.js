@@ -125,6 +125,24 @@ export const INGRESOS_COLUMNS = [
   { header: 'Ingreso acumulado', field: 'ingreso_acumulado', type: 'number' },
 ]
 
+// El archivo de ingresos que Johany descarga aparte del sistema (antes lo
+// copiaba a mano dentro de IngresosSistema). Trae nombres de columna
+// tecnicos, distintos a los del Excel combinado.
+export const INGRESOS_RAW_COLUMNS = [
+  { header: 'fechadoc', field: 'fecha_ingreso', type: 'date' },
+  { header: 'descrip', field: 'descripcion', type: 'text' },
+  { header: 'codigo', field: 'codigo', type: 'text' },
+  { header: 'prov', field: 'proveedor', type: 'text' },
+  { header: 'cantidad', field: 'cantidad_ingresada', type: 'number' },
+  { header: 'moneda', field: 'moneda', type: 'text' },
+  { header: 'precio', field: 'precio', type: 'number' },
+  { header: 'nanalisis', field: 'numero_analisis', type: 'text' },
+  { header: 'lote', field: 'lote', type: 'text' },
+  { header: 'oc', field: 'oc', type: 'oc' },
+  { header: 'fecha_oc', field: 'fecha_oc', type: 'date' },
+  { header: 'est', field: 'estado_ingreso_sistema', type: 'text' },
+]
+
 // Opciones fijas, sacadas de la hoja "info" del Excel. No son datos, son catálogo.
 export const OPCIONES = {
   estado_gestion: [

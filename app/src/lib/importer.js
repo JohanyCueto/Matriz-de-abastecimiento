@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
-import { PROGRAMACION_COLUMNS, EDITABLE_ON_APP, INGRESOS_COLUMNS } from './schema'
+import { PROGRAMACION_COLUMNS, EDITABLE_ON_APP, INGRESOS_COLUMNS, INGRESOS_RAW_COLUMNS } from './schema'
 
 const cleanText = v => {
   if (v == null) return null
@@ -16,11 +16,19 @@ const isoDate = v => {
 }
 const toNumber = v => (v == null || v === '') ? null : Number(v)
 const toInt = v => (v == null || v === '') ? null : parseInt(v, 10)
+// El archivo de ingresos a veces trae el numero de OC como "OC2500003055"
+// en vez de 2500003055. Se le quita cualquier letra pegada adelante.
+const toOc = v => {
+  if (v == null || v === '') return null
+  const s = String(v).replace(/^\D+/, '').trim()
+  return s === '' ? null : parseInt(s, 10)
+}
 
 function convertCell(type, value) {
   if (type === 'date') return isoDate(value)
   if (type === 'number') return toNumber(value)
   if (type === 'int') return toInt(value)
+  if (type === 'oc') return toOc(value)
   return cleanText(value)
 }
 
@@ -105,6 +113,25 @@ export function calcularIngresos(entregas, eventos) {
   }
 }
 
+// Junta entregas y eventos de ingreso por OC+SKU, y llama a calcularIngresos
+// en cada grupo. Lo usan tanto el importador del Excel combinado como el
+// del archivo de ingresos aparte.
+function recalcularGrupos(entregas, eventos) {
+  const eventosPorGrupo = new Map()
+  for (const ev of eventos) {
+    const k = `${ev.oc}|${ev.codigo}`
+    if (!eventosPorGrupo.has(k)) eventosPorGrupo.set(k, [])
+    eventosPorGrupo.get(k).push(ev)
+  }
+  const entregasPorGrupo = new Map()
+  for (const e of entregas) {
+    const k = `${e.oc}|${e.sku}`
+    if (!entregasPorGrupo.has(k)) entregasPorGrupo.set(k, [])
+    entregasPorGrupo.get(k).push(e)
+  }
+  for (const [k, grupo] of entregasPorGrupo) calcularIngresos(grupo, eventosPorGrupo.get(k) || [])
+}
+
 export async function importarExcel(file, onStep) {
   onStep?.('Leyendo el archivo...')
   const buf = await file.arrayBuffer()
@@ -159,25 +186,8 @@ export async function importarExcel(file, onStep) {
   // repetido dos veces si viene de dos archivos de origen distintos.
   const ingresosNuevos = [...new Map(ingresosNuevosRaw.map(e => [e.numero_analisis, e])).values()]
 
-  const eventosPorGrupo = new Map()
-  const agregarEvento = (oc, codigo, fecha, cantidad) => {
-    const k = `${oc}|${codigo}`
-    if (!eventosPorGrupo.has(k)) eventosPorGrupo.set(k, [])
-    eventosPorGrupo.get(k).push({ fecha_ingreso: fecha, cantidad_ingresada: cantidad })
-  }
-  for (const ev of existentesIng) agregarEvento(ev.oc, ev.codigo, ev.fecha_ingreso, ev.cantidad_ingresada)
-  for (const ev of ingresosNuevos) agregarEvento(ev.oc, ev.codigo, ev.fecha_ingreso, ev.cantidad_ingresada)
-
   onStep?.('Calculando avance de cada entrega...')
-  const entregasPorGrupo = new Map()
-  for (const e of entregasUnicas) {
-    const k = `${e.oc}|${e.sku}`
-    if (!entregasPorGrupo.has(k)) entregasPorGrupo.set(k, [])
-    entregasPorGrupo.get(k).push(e)
-  }
-  for (const [k, grupo] of entregasPorGrupo) {
-    calcularIngresos(grupo, eventosPorGrupo.get(k) || [])
-  }
+  recalcularGrupos(entregasUnicas, [...existentesIng, ...ingresosNuevos])
 
   onStep?.('Guardando en la base de datos...')
   await upsertInBatches('programacion_oc', entregasUnicas, 'id_entrega')
@@ -186,5 +196,53 @@ export async function importarExcel(file, onStep) {
   return {
     entregas: entregasUnicas.length,
     ingresosNuevos: ingresosNuevos.length,
+  }
+}
+
+// El archivo que Johany descarga aparte del sistema, con lo que entro
+// realmente a almacen. No trae la programacion de OC, asi que aqui solo se
+// agregan los ingresos nuevos y se recalculan las entregas ya guardadas.
+export async function importarIngresos(file, onStep) {
+  onStep?.('Leyendo el archivo...')
+  const buf = await file.arrayBuffer()
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+  const hoja = wb.Sheets[wb.SheetNames[0]]
+  if (!hoja) throw new Error('No se pudo leer el archivo.')
+  const rawIng = XLSX.utils.sheet_to_json(hoja, { defval: null })
+
+  onStep?.('Revisando lo que ya tienes guardado...')
+  const existentesIng = await fetchAll('ingresos_sistema', 'numero_analisis,oc,codigo,cantidad_ingresada,fecha_ingreso')
+  const numerosExistentes = new Set(existentesIng.map(r => r.numero_analisis))
+
+  onStep?.('Sumando los ingresos nuevos...')
+  const ingresosNuevosRaw = rawIng
+    .map(raw => ({ ...mapRow(raw, INGRESOS_RAW_COLUMNS), archivo_origen_ingreso: file.name }))
+    .filter(e => e.numero_analisis && !numerosExistentes.has(e.numero_analisis))
+  const ingresosNuevos = [...new Map(ingresosNuevosRaw.map(e => [e.numero_analisis, e])).values()]
+    .map(e => ({ ...e, ingreso_acumulado: e.cantidad_ingresada }))
+
+  onStep?.('Calculando avance de cada entrega...')
+  const entregas = await fetchAll('programacion_oc',
+    'id_entrega,oc,sku,orden_entrega,cant_programada,precio_unitario,fecha_programada_ingreso')
+  recalcularGrupos(entregas, [...existentesIng, ...ingresosNuevos])
+
+  onStep?.('Guardando en la base de datos...')
+  await insertInBatches('ingresos_sistema', ingresosNuevos)
+  const actualizaciones = entregas.map(e => ({
+    id_entrega: e.id_entrega,
+    cant_ingresada: e.cant_ingresada,
+    saldo_pendiente: e.saldo_pendiente,
+    pct_ingreso: e.pct_ingreso,
+    estado_ingreso: e.estado_ingreso,
+    fecha_real_ingreso: e.fecha_real_ingreso,
+    dias_atraso: e.dias_atraso,
+    valor_ingresado: e.valor_ingresado,
+    valor_pendiente: e.valor_pendiente,
+  }))
+  await upsertInBatches('programacion_oc', actualizaciones, 'id_entrega')
+
+  return {
+    ingresosNuevos: ingresosNuevos.length,
+    entregasActualizadas: entregas.length,
   }
 }
