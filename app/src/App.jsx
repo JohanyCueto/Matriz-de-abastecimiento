@@ -61,7 +61,11 @@ export default function App() {
     ultimasImportaciones().then(setImportaciones).catch(() => {})
   }
 
-  useEffect(() => { if (sesion) cargar() }, [sesion])
+  // Ojo: Supabase renueva el token de sesion cada vez que vuelves a la
+  // pestaña, generando una sesion "nueva" aunque sigas siendo la misma
+  // persona. Por eso se compara el id de usuario, no el objeto sesion
+  // completo, para no recargar todo y que la pantalla no parpadee.
+  useEffect(() => { if (sesion) cargar() }, [sesion?.user?.id])
 
   function actualizarFila(id, patch) {
     setRows(prev => withEntregas(prev.map(r => r.id_entrega === id ? enrich({ ...r, ...patch }) : r).map(r => ({ ...r }))))
