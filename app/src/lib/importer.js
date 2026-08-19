@@ -60,6 +60,11 @@ async function upsertInBatches(table, rows, onConflict, size = 200) {
   }
 }
 
+async function registrarImportacion(tipo, archivo, filas) {
+  const { error } = await supabase.from('importaciones').insert({ tipo, archivo, filas })
+  if (error) throw error
+}
+
 async function insertInBatches(table, rows, size = 500) {
   for (let i = 0; i < rows.length; i += size) {
     const batch = rows.slice(i, i + size)
@@ -192,6 +197,7 @@ export async function importarExcel(file, onStep) {
   onStep?.('Guardando en la base de datos...')
   await upsertInBatches('programacion_oc', entregasUnicas, 'id_entrega')
   await insertInBatches('ingresos_sistema', ingresosNuevos)
+  await registrarImportacion('programacion', file.name, entregasUnicas.length)
 
   return {
     entregas: entregasUnicas.length,
@@ -244,6 +250,7 @@ export async function importarIngresos(file, onStep) {
     valor_pendiente: e.valor_pendiente,
   }))
   await upsertInBatches('programacion_oc', actualizaciones, 'id_entrega')
+  await registrarImportacion('ingresos', file.name, ingresosNuevos.length)
 
   return {
     ingresosNuevos: ingresosNuevos.length,

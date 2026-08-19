@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { useSesion } from './lib/auth'
 import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
+import { ultimasImportaciones, hace } from './lib/importaciones'
 import Panel from './Panel'
 import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
@@ -48,6 +49,7 @@ export default function App() {
   const [soloTol, setSoloTol] = useState(false)
   const [sortK, setSortK] = useState('sem2')
   const [sortD, setSortD] = useState(1)
+  const [importaciones, setImportaciones] = useState({})
 
   async function cargar() {
     setLoading(true)
@@ -56,6 +58,7 @@ export default function App() {
     if (error) { setErr(error.message); setLoading(false); return }
     setRows(withEntregas(data.map(enrich)))
     setLoading(false)
+    ultimasImportaciones().then(setImportaciones).catch(() => {})
   }
 
   useEffect(() => { if (sesion) cargar() }, [sesion])
@@ -182,6 +185,14 @@ export default function App() {
         <div>
           <h1>Seguimiento de materiales de empaque</h1>
           <div className="sub">Ordenes de compra programadas y su estado real de ingreso a almacen</div>
+          <div className="ultimasImp">
+            {importaciones.programacion && (
+              <span>Ultimo Excel: <b>{importaciones.programacion.archivo}</b> ({hace(importaciones.programacion.creado_en)})</span>
+            )}
+            {importaciones.ingresos && (
+              <span>Ultimos ingresos: <b>{importaciones.ingresos.archivo}</b> ({hace(importaciones.ingresos.creado_en)})</span>
+            )}
+          </div>
         </div>
         <div className="corte">
           <div className="usr">
