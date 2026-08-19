@@ -14,13 +14,12 @@ export default function ImportButton({ onDone }) {
     setStatus('Empezando...')
     try {
       const r = await importarExcel(file, setStatus)
-      setStatus(`Listo: ${r.entregas} entregas actualizadas, ${r.ingresosNuevos} ingresos nuevos.`)
+      setStatus(`✓ ${file.name} subido con exito — ${r.entregas} entregas, ${r.ingresosNuevos} ingresos nuevos`)
       onDone()
     } catch (err) {
       setStatus('Error: ' + err.message)
     } finally {
       setBusy(false)
-      setTimeout(() => setStatus(null), 6000)
     }
   }
 
@@ -30,7 +29,7 @@ export default function ImportButton({ onDone }) {
         {busy ? 'Importando...' : 'Importar Excel'}
       </button>
       <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
-      {status && <span className="impst">{status}</span>}
+      {status && <span className={`impst ${status.startsWith('Error') ? 'err' : ''}`}>{status}</span>}
     </div>
   )
 }

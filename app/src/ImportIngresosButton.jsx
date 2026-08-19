@@ -14,13 +14,12 @@ export default function ImportIngresosButton({ onDone }) {
     setStatus('Empezando...')
     try {
       const r = await importarIngresos(file, setStatus)
-      setStatus(`Listo: ${r.ingresosNuevos} ingresos nuevos, ${r.entregasActualizadas} entregas revisadas.`)
+      setStatus(`✓ ${file.name} subido con exito — ${r.ingresosNuevos} ingresos nuevos, ${r.entregasActualizadas} entregas revisadas`)
       onDone()
     } catch (err) {
       setStatus('Error: ' + err.message)
     } finally {
       setBusy(false)
-      setTimeout(() => setStatus(null), 6000)
     }
   }
 
@@ -30,7 +29,7 @@ export default function ImportIngresosButton({ onDone }) {
         {busy ? 'Importando...' : 'Importar Ingresos'}
       </button>
       <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
-      {status && <span className="impst">{status}</span>}
+      {status && <span className={`impst ${status.startsWith('Error') ? 'err' : ''}`}>{status}</span>}
     </div>
   )
 }
