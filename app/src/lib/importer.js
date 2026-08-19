@@ -230,6 +230,10 @@ export async function importarIngresos(file, onStep) {
   await insertInBatches('ingresos_sistema', ingresosNuevos)
   const actualizaciones = entregas.map(e => ({
     id_entrega: e.id_entrega,
+    // oc y sku son obligatorias en la tabla: aunque no cambien, Postgres
+    // las exige presentes al construir la fila del upsert.
+    oc: e.oc,
+    sku: e.sku,
     cant_ingresada: e.cant_ingresada,
     saldo_pendiente: e.saldo_pendiente,
     pct_ingreso: e.pct_ingreso,
