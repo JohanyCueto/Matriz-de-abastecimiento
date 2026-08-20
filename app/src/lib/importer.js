@@ -107,7 +107,11 @@ export function calcularIngresos(entregas, eventos) {
     e.cant_ingresada = fill
     e.saldo_pendiente = saldo
     e.pct_ingreso = e.cant_programada ? Math.round((fill / e.cant_programada) * 1000) / 10 : 0
-    e.estado_ingreso = fill <= 0 ? 'Pendiente' : (saldo > 0 ? 'Parcial' : 'Completo')
+    // "Parcial" ya no es un estado aparte: si queda saldo, sea porque no
+    // llego nada o porque llego solo una parte, para el seguimiento da lo
+    // mismo, sigue Pendiente. La cantidad exacta que ya llego se sigue
+    // viendo en Cant. Ingresada / Saldo pendiente / % de avance.
+    e.estado_ingreso = saldo > 0 ? 'Pendiente' : 'Completo'
     e.fecha_real_ingreso = e._fechaCompleta || null
     e.dias_atraso = (e.fecha_real_ingreso && e.fecha_programada_ingreso)
       ? Math.max(0, Math.round((new Date(e.fecha_real_ingreso) - new Date(e.fecha_programada_ingreso)) / 864e5))

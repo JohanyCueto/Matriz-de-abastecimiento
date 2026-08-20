@@ -10,7 +10,7 @@ import ExportButton from './ExportButton'
 import Login from './Login'
 import './App.css'
 
-const CAT_EST = ['Pendiente', 'Parcial', 'Completo']
+const CAT_EST = ['Pendiente', 'Completo']
 const CAT_GES = ['En seguimiento', 'Reprogramado', 'Atrasado', 'Cerrado']
 
 const COLS = [

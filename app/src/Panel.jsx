@@ -143,7 +143,7 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
                   <div className="hint">
                     {row.estado_ingreso === 'Completo'
                       ? 'La entrega llego completa, por eso solo se puede cerrar.'
-                      : (row.estado_ingreso === 'Parcial'
+                      : ((row.cant_ingresada || 0) > 0
                         ? 'Si la cierras con saldo pendiente, queda marcada como cierre dentro de tolerancia y se calcula el porcentaje de desviacion.'
                         : 'Todavia no ingresa nada. Si la cierras se registrara como cierre con saldo, revisa antes con el proveedor.')}
                   </div>

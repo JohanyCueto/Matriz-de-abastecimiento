@@ -27,7 +27,7 @@ export const SEM = {
   tolerancia: { c: 'var(--grn)', t: 't-grn', l: 'Cerrada dentro de tolerancia' },
   cerrado: { c: 'var(--gry)', t: 't-gry', l: 'Cerrado' },
 }
-export const EST_TAG = { Completo: 't-grn', Parcial: 't-amb', Pendiente: 't-blu' }
+export const EST_TAG = { Completo: 't-grn', Pendiente: 't-blu' }
 export const GES_TAG = { 'En seguimiento': 't-blu', Reprogramado: 't-amb', Atrasado: 't-red', Cerrado: 't-gry' }
 
 export const MOTIVOS = ['', 'Falta de stock proveedor', 'Demora producción proveedor', 'Demora logística / despacho', 'Ingreso parcial', 'Reprogramación interna']
