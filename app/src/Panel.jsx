@@ -53,8 +53,9 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
         <div className="pb">
           <div className="sec">
             <span className={`tag ${s.t}`}>{s.l}</span>
-            {row.abierto && row.dd < 0 && <span className="tag t-red" style={{ marginLeft: 6 }}>{-row.dd} dias de atraso</span>}
-            {row.abierto && row.dd >= 0 && <span className="tag t-blu" style={{ marginLeft: 6 }}>faltan {row.dd} dias</span>}
+            {row.abierto && row.dd == null && <span className="tag t-amb" style={{ marginLeft: 6 }}>sin fecha programada</span>}
+            {row.abierto && row.dd != null && row.dd < 0 && <span className="tag t-red" style={{ marginLeft: 6 }}>{-row.dd} dias de atraso</span>}
+            {row.abierto && row.dd != null && row.dd >= 0 && <span className="tag t-blu" style={{ marginLeft: 6 }}>faltan {row.dd} dias</span>}
             {row.hist.length > 0 && <span className="tag t-amb" style={{ marginLeft: 6 }}>Reprogramada {row.hist.length} {row.hist.length === 1 ? 'vez' : 'veces'}</span>}
             {row.tol && (
               <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 9, background: 'var(--grnbg)', padding: '9px 11px', borderRadius: 8, lineHeight: 1.45 }}>

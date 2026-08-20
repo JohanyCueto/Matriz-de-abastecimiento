@@ -169,10 +169,12 @@ export async function importarExcel(file, onStep) {
     return {
       ...base,
       ...editable,
-      // Una vez que la fila existe, la fecha programada solo cambia
-      // reprogramando desde la app (que deja historial). Si no, una
-      // resubida del Excel podria pisar una reprogramacion ya hecha.
-      fecha_programada_ingreso: prev ? prev.fecha_programada_ingreso : base.fecha_programada_ingreso,
+      // Una vez que la fila tiene una fecha guardada, solo cambia
+      // reprogramando desde la app (que deja historial), para que una
+      // resubida del Excel no pise una reprogramacion ya hecha. Pero si
+      // todavia no tenia fecha (vino vacia la primera vez), si se deja
+      // pasar la que traiga el Excel esta vez.
+      fecha_programada_ingreso: (prev && prev.fecha_programada_ingreso) ? prev.fecha_programada_ingreso : base.fecha_programada_ingreso,
       reabierta: prev ? prev.reabierta : false,
       historial: prev ? prev.historial : [],
     }

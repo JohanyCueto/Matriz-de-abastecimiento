@@ -82,6 +82,7 @@ export default function App() {
     const ab = rows.filter(r => r.abierto)
     const at = ab.filter(r => r.sem2 === 'atrasado')
     const pl = ab.filter(r => r.sem2 === 'porllegar')
+    const sf = ab.filter(r => r.sem2 === 'sinfecha')
     const vs = ab.filter(r => r.moneda === 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const vd = ab.filter(r => r.moneda !== 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const rp = rows.filter(r => r.hist.length).length
@@ -91,6 +92,7 @@ export default function App() {
       { id: '', lb: 'Lineas totales', vl: rows.length, ft: 'entregas programadas', cl: '' },
       { id: 'abierto', lb: 'Abiertas', vl: ab.length, ft: 'con saldo pendiente', cl: '' },
       { id: 'atrasado', lb: 'Atrasadas', vl: at.length, ft: 'pasaron su fecha', cl: 'r' },
+      { id: 'sinfecha', lb: 'Sin fecha programada', vl: sf.length, ft: 'necesitan fecha', cl: 'a' },
       { id: 'porllegar', lb: 'Llegan en 7 dias', vl: pl.length, ft: 'ventana inmediata', cl: 'a' },
       { id: 'repro', lb: 'Reprogramadas', vl: rp, ft: 'con fecha movida', cl: 'a' },
       { id: 'cerrado', lb: 'Cerradas', vl: cc + tl, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia`, cl: 'g' },
@@ -113,12 +115,13 @@ export default function App() {
       if (quick === 'abierto' && !r.abierto) return false
       if (quick === 'cerrado' && r.abierto) return false
       if (quick === 'atrasado' && r.sem2 !== 'atrasado') return false
+      if (quick === 'sinfecha' && r.sem2 !== 'sinfecha') return false
       if (quick === 'porllegar' && r.sem2 !== 'porllegar') return false
       if (quick === 'repro' && !r.hist.length) return false
       if (soloTol && !r.tol) return false
       return true
     })
-    const ord = { atrasado: 0, porllegar: 1, enfecha: 2, tolerancia: 3, cerrado: 4 }
+    const ord = { atrasado: 0, sinfecha: 1, porllegar: 2, enfecha: 3, tolerancia: 4, cerrado: 5 }
     out.sort((a, b) => {
       if (sortK === 'sem2') return (ord[a.sem2] - ord[b.sem2]) * sortD
       let x = a[sortK], y = b[sortK]
@@ -161,6 +164,7 @@ export default function App() {
       case 'dd':
         if (r.tol) return <span className="dim">tolerancia</span>
         if (!r.abierto) return <span className="dim">{r.dias_atraso ? '+' + fmt(r.dias_atraso) : '0'}</span>
+        if (r.dd == null) return <span style={{ color: 'var(--amb)', fontWeight: 500 }}>sin fecha</span>
         if (r.dd < 0) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>{-r.dd} atraso</span>
         return <span className="dim">faltan {r.dd}</span>
       case 'desv': {

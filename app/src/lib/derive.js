@@ -23,6 +23,7 @@ export const SEM = {
   atrasado: { c: 'var(--red)', t: 't-red', l: 'Atrasado' },
   porllegar: { c: 'var(--amb)', t: 't-amb', l: 'Por llegar' },
   enfecha: { c: 'var(--blu)', t: 't-blu', l: 'En fecha' },
+  sinfecha: { c: 'var(--amb)', t: 't-amb', l: 'Sin fecha programada' },
   tolerancia: { c: 'var(--grn)', t: 't-grn', l: 'Cerrada dentro de tolerancia' },
   cerrado: { c: 'var(--gry)', t: 't-gry', l: 'Cerrado' },
 }
@@ -63,7 +64,7 @@ export function enrich(r) {
   let sem2
   if (tol) sem2 = 'tolerancia'
   else if (!abierto) sem2 = 'cerrado'
-  else if (dd == null) sem2 = 'enfecha'
+  else if (dd == null) sem2 = 'sinfecha'
   else if (dd < 0) sem2 = 'atrasado'
   else if (dd <= 7) sem2 = 'porllegar'
   else sem2 = 'enfecha'
