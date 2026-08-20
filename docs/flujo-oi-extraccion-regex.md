@@ -236,5 +236,11 @@ en vez de una suposición.
    "Pendiente revisión".
 4. Dejar "Archivo origen" con el nombre del PDF de OI (igual que OC), para
    poder rastrear de qué documento salió cada fila.
-5. Probar con el PDF de ejemplo primero, verificar fila por fila contra lo
+5. Incluir desde el inicio el ajuste de "carpeta de cotizaciones por
+   documento" (crear una carpeta con el nombre del PDF y mover el PDF
+   adentro, en vez de dejarlo suelto en `02_OI_Procesadas`) — ver
+   `docs/carpeta-cotizaciones-oc-oi.md` para el detalle de las acciones.
+   Se aplica primero al flujo de OC y, cuando esté probado ahí, se copia
+   igual al de OI.
+6. Probar con el PDF de ejemplo primero, verificar fila por fila contra lo
    que muestra el PDF, y recién después soltarlo sobre la carpeta real.
