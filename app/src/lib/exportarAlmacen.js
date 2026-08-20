@@ -13,10 +13,12 @@ function descargarBlob(blob, nombre) {
 
 // El cuadro que Johany sube a la carpeta compartida de SharePoint para
 // almacen, con las fechas de entrega que estan por llegar. Columnas fijas,
-// igual al archivo que ya usa almacen (CUADRO DE INGRESOS). "Cantidad OC" y
-// "Cantidad programada" son el mismo numero repetido en dos columnas (asi
-// las pide almacen), y la unidad de medida se deja fija en "UNIDAD" porque
-// hoy todo lo que se maneja se cuenta asi.
+// igual al archivo que ya usa almacen (CUADRO DE INGRESOS). "Cantidad OC"
+// es el total pedido (no cambia); "Cantidad programada" es lo que falta
+// por llegar de esa entrega, asi que baja cuando ya llego una parte (si
+// no, una entrega con ingreso parcial le decia a almacen que esperara el
+// total de nuevo, en vez de solo el saldo real). La unidad de medida se
+// deja fija en "UNIDAD" porque hoy todo lo que se maneja se cuenta asi.
 export async function exportarCuadroAlmacen() {
   const { data, error } = await supabase.from('programacion_oc')
     .select('sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,cant_ingresada,saldo_pendiente,estado_gestion')
@@ -54,7 +56,7 @@ export async function exportarCuadroAlmacen() {
       r.sku,
       r.descripcion,
       r.cant_programada,
-      r.cant_programada,
+      r.saldo_pendiente,
       'UNIDAD',
       r.fecha_programada_ingreso ? new Date(r.fecha_programada_ingreso + 'T00:00:00') : null,
       r.proveedor,
