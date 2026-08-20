@@ -19,8 +19,15 @@ export const days = s => s ? Math.round((new Date(s + 'T00:00:00') - new Date())
 
 export const CERRADAS = ['Cerrado']
 
+// Margen aceptado al cerrar una entrega con falta o demasia frente a lo
+// programado. Dentro de este margen se acepta como cierre normal; mas alla,
+// sigue necesitando que Johany lo cierre a mano, pero se marca aparte para
+// que salte a la vista que puede afectar el abastecimiento.
+export const TOLERANCIA_MARGEN = 0.08
+
 export const SEM = {
   atrasado: { c: 'var(--red)', t: 't-red', l: 'Atrasado' },
+  desviado: { c: 'var(--red)', t: 't-red', l: 'Cerrada fuera de tolerancia' },
   porllegar: { c: 'var(--amb)', t: 't-amb', l: 'Por llegar' },
   enfecha: { c: 'var(--blu)', t: 't-blu', l: 'En fecha' },
   sinfecha: { c: 'var(--amb)', t: 't-amb', l: 'Sin fecha programada' },
@@ -56,13 +63,21 @@ export function withEntregas(rows) {
 export function enrich(r) {
   const saldo = r.saldo_pendiente || 0
   const abierto = saldo > 0 && !CERRADAS.includes(r.estado_gestion)
+  // "Cerrada con saldo" (tol, en el sentido amplio) pasa siempre por una
+  // decision manual de Johany. Dentro del margen de tolerancia se acepta
+  // como cierre normal (verde); mas alla del margen sigue siendo un cierre
+  // manual suyo, pero se distingue para que revise si le afecta el
+  // abastecimiento (rojo, "fuera de tolerancia").
   const tol = CERRADAS.includes(r.estado_gestion) && saldo > 0
   const dd = days(r.fecha_programada_ingreso)
   const prog = r.cant_programada || 0
   const avance = prog ? Math.min(1, (r.cant_ingresada || 0) / prog) : 0
   const desv = prog ? ((r.cant_ingresada || 0) - prog) / prog : 0
+  const dentroTolerancia = tol && Math.abs(desv) <= TOLERANCIA_MARGEN
+  const fueraTolerancia = tol && Math.abs(desv) > TOLERANCIA_MARGEN
   let sem2
-  if (tol) sem2 = 'tolerancia'
+  if (dentroTolerancia) sem2 = 'tolerancia'
+  else if (fueraTolerancia) sem2 = 'desviado'
   else if (!abierto) sem2 = 'cerrado'
   else if (dd == null) sem2 = 'sinfecha'
   else if (dd < 0) sem2 = 'atrasado'
@@ -77,5 +92,5 @@ export function enrich(r) {
   const estadoGestion = !abierto ? 'Cerrado'
     : (dd != null && dd < 0) ? 'Atrasado'
     : (r.estado_gestion || 'En seguimiento')
-  return { ...r, estado_gestion: estadoGestion, abierto, tol, dd, avance, desv, sem2, hist, fprog0 }
+  return { ...r, estado_gestion: estadoGestion, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
 }

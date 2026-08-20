@@ -86,8 +86,9 @@ export default function App() {
     const vs = ab.filter(r => r.moneda === 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const vd = ab.filter(r => r.moneda !== 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const rp = rows.filter(r => r.hist.length).length
-    const tl = rows.filter(r => r.tol).length
-    const cc = rows.length - ab.length - tl
+    const tl = rows.filter(r => r.dentroTolerancia).length
+    const fd = rows.filter(r => r.fueraTolerancia).length
+    const cc = rows.length - ab.length - tl - fd
     return [
       { id: '', lb: 'Lineas totales', vl: rows.length, ft: 'entregas programadas', cl: '' },
       { id: 'abierto', lb: 'Abiertas', vl: ab.length, ft: 'con saldo pendiente', cl: '' },
@@ -95,7 +96,8 @@ export default function App() {
       { id: 'sinfecha', lb: 'Sin fecha programada', vl: sf.length, ft: 'necesitan fecha', cl: 'a' },
       { id: 'porllegar', lb: 'Llegan en 7 dias', vl: pl.length, ft: 'ventana inmediata', cl: 'a' },
       { id: 'repro', lb: 'Reprogramadas', vl: rp, ft: 'con fecha movida', cl: 'a' },
-      { id: 'cerrado', lb: 'Cerradas', vl: cc + tl, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia`, cl: 'g' },
+      { id: 'desviado', lb: 'Cerradas fuera de tolerancia', vl: fd, ft: 'revisar si afecta el abastecimiento', cl: fd > 0 ? 'r' : '' },
+      { id: 'cerrado', lb: 'Cerradas', vl: cc + tl + fd, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia, ${fmt(fd)} fuera de tolerancia`, cl: 'g' },
       { id: 'valor', lb: 'Valor pendiente', vl: `S/ ${fmt(vs)}`, ft: `mas US$ ${fmt(vd)}`, cl: '' },
     ]
   }, [rows])
@@ -118,10 +120,11 @@ export default function App() {
       if (quick === 'sinfecha' && r.sem2 !== 'sinfecha') return false
       if (quick === 'porllegar' && r.sem2 !== 'porllegar') return false
       if (quick === 'repro' && !r.hist.length) return false
+      if (quick === 'desviado' && r.sem2 !== 'desviado') return false
       if (soloTol && !r.tol) return false
       return true
     })
-    const ord = { atrasado: 0, sinfecha: 1, porllegar: 2, enfecha: 3, tolerancia: 4, cerrado: 5 }
+    const ord = { atrasado: 0, desviado: 1, sinfecha: 2, porllegar: 3, enfecha: 4, tolerancia: 5, cerrado: 6 }
     out.sort((a, b) => {
       if (sortK === 'sem2') return (ord[a.sem2] - ord[b.sem2]) * sortD
       let x = a[sortK], y = b[sortK]
@@ -162,7 +165,8 @@ export default function App() {
         {r.hist.length > 0 && <span className="rep" title={`Reprogramada ${r.hist.length} ${r.hist.length === 1 ? 'vez' : 'veces'}. Fecha original ${fdate(r.fprog0)}`}>R{r.hist.length > 1 ? r.hist.length : ''}</span>}
       </>
       case 'dd':
-        if (r.tol) return <span className="dim">tolerancia</span>
+        if (r.dentroTolerancia) return <span className="dim">tolerancia</span>
+        if (r.fueraTolerancia) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>fuera de tolerancia</span>
         if (!r.abierto) return <span className="dim">{r.dias_atraso ? '+' + fmt(r.dias_atraso) : '0'}</span>
         if (r.dd == null) return <span style={{ color: 'var(--amb)', fontWeight: 500 }}>sin fecha</span>
         if (r.dd < 0) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>{-r.dd} atraso</span>
@@ -170,12 +174,13 @@ export default function App() {
       case 'desv': {
         if (!r.tol) return <span className="dim">-</span>
         const pc = r.desv * 100
-        return <span className="tag t-grn" title={`Cerrada con ${pc > 0 ? 'exceso' : 'faltante'} de ${Math.abs(pc).toFixed(1)}% frente a lo programado`}>{pc > 0 ? '+' : ''}{pc.toFixed(1)}%</span>
+        return <span className={`tag ${r.dentroTolerancia ? 't-grn' : 't-red'}`} title={`Cerrada con ${pc > 0 ? 'exceso' : 'faltante'} de ${Math.abs(pc).toFixed(1)}% frente a lo programado${r.fueraTolerancia ? ' (supera el margen de 8%)' : ''}`}>{pc > 0 ? '+' : ''}{pc.toFixed(1)}%</span>
       }
       case 'estado_ingreso': return <span className={`tag ${EST_TAG[r.estado_ingreso] || 't-gry'}`}>{r.estado_ingreso}</span>
       case 'estado_gestion': return <>
         <span className={`tag ${GES_TAG[r.estado_gestion] || 't-gry'}`}>{r.estado_gestion || ''}</span>
-        {r.tol && <span className="rep tolm" title="Cierre dentro de tolerancia">T</span>}
+        {r.dentroTolerancia && <span className="rep tolm" title="Cierre dentro de tolerancia">T</span>}
+        {r.fueraTolerancia && <span className="rep tolm" style={{ background: 'var(--red)' }} title="Cierre fuera de tolerancia: revisar abastecimiento">!</span>}
       </>
       default: return null
     }

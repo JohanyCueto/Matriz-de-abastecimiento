@@ -100,10 +100,16 @@ export function calcularIngresos(entregas, eventos) {
   }
   const totalIngresado = eventos.reduce((a, e) => a + (e.cantidad_ingresada || 0), 0)
   let restanteGlobal = totalIngresado
-  for (const e of entregas) {
-    const fill = Math.min(restanteGlobal, e.cant_programada || 0)
+  entregas.forEach((e, i) => {
+    // Cada entrega se llena hasta su propio programado, y el resto pasa a
+    // la siguiente (asi entregan los proveedores). La ultima entrega de la
+    // OC+SKU no tiene a donde pasar lo que sobre, asi que se queda con
+    // todo lo que llegue de mas: si no, una demasia (llego mas de lo
+    // programado) se perdia sin mostrarse en ningun lado.
+    const esUltima = i === entregas.length - 1
+    const fill = esUltima ? restanteGlobal : Math.min(restanteGlobal, e.cant_programada || 0)
     restanteGlobal -= fill
-    const saldo = (e.cant_programada || 0) - fill
+    const saldo = Math.max(0, (e.cant_programada || 0) - fill)
     e.cant_ingresada = fill
     e.saldo_pendiente = saldo
     e.pct_ingreso = e.cant_programada ? Math.round((fill / e.cant_programada) * 1000) / 10 : 0
@@ -119,7 +125,7 @@ export function calcularIngresos(entregas, eventos) {
     e.valor_ingresado = e.precio_unitario != null ? Math.round(e.precio_unitario * fill * 100) / 100 : null
     e.valor_pendiente = e.precio_unitario != null ? Math.round(e.precio_unitario * saldo * 100) / 100 : null
     delete e._fechaCompleta
-  }
+  })
 }
 
 // Junta entregas y eventos de ingreso por OC+SKU, y llama a calcularIngresos
