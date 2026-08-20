@@ -94,7 +94,10 @@ export function enrich(r) {
     : (r.estado_gestion || 'En seguimiento')
   // Igual que Gestion: si el dato guardado quedo viejo (por ejemplo un
   // "Parcial" de antes de fusionar ese estado con Pendiente), no se
-  // confia en el valor de la base, se calcula solo del saldo actual.
-  const estadoIngreso = saldo > 0 ? 'Pendiente' : 'Completo'
+  // confia en el valor de la base, se calcula solo. "Pendiente" quiere
+  // decir que la linea sigue abierta y necesita seguimiento: si ya la
+  // cerraste (aunque sea con tolerancia y le falte un poco), ya no cuenta
+  // como pendiente.
+  const estadoIngreso = abierto ? 'Pendiente' : 'Completo'
   return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
 }

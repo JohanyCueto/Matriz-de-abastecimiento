@@ -54,8 +54,10 @@ export async function exportarExcel() {
       case 'estado_ingreso':
         // No se confia en el texto guardado (puede quedar un "Parcial"
         // viejo de antes de fusionar ese estado con Pendiente): se calcula
-        // del saldo, igual que en la app.
-        return (r.saldo_pendiente || 0) > 0 ? 'Pendiente' : 'Completo'
+        // de si la linea sigue abierta, igual que en la app. Si ya se
+        // cerro (aunque sea con tolerancia y le falte un poco), ya no
+        // cuenta como pendiente.
+        return ((r.saldo_pendiente || 0) > 0 && r.estado_gestion !== 'Cerrado') ? 'Pendiente' : 'Completo'
       case 'estado_gestion': {
         // Misma correccion que en la app: si ya no hay saldo (o ya esta
         // cerrada), se ve Cerrado; si se paso la fecha, Atrasado.
