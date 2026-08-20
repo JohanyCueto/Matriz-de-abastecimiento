@@ -4,6 +4,7 @@ import { useSesion } from './lib/auth'
 import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
 import { ultimasImportaciones, hace } from './lib/importaciones'
 import Panel from './Panel'
+import Recordatorio from './Recordatorio'
 import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
@@ -38,6 +39,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
+  const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
 
   const [q, setQ] = useState('')
   const [fEst, setFEst] = useState('')
@@ -258,6 +260,7 @@ export default function App() {
             {esEditor && <ImportButton onDone={cargar} />}
             {esEditor && <ImportIngresosButton onDone={cargar} />}
             <ExportButton />
+            <button className="btn" onClick={() => setMostrarRecordatorio(true)}>Recordatorio proveedor</button>
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
 
@@ -289,6 +292,10 @@ export default function App() {
 
       {selected && (
         <Panel row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
+      )}
+
+      {mostrarRecordatorio && (
+        <Recordatorio rows={rows} proveedores={proveedores} onClose={() => setMostrarRecordatorio(false)} />
       )}
     </div>
   )
