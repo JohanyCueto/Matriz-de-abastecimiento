@@ -161,6 +161,10 @@ export async function importarExcel(file, onStep) {
   onStep?.('Preparando las entregas...')
   const entregas = rawProg.map(raw => {
     const base = mapRow(raw, PROGRAMACION_COLUMNS)
+    // No confiamos en que la columna "ID entrega" del Excel siempre venga
+    // llena (a veces esta vacia): la armamos nosotros mismos con OC, SKU
+    // y N. entrega, que es exactamente como esta armada cuando si viene.
+    base.id_entrega = `${base.oc}-${base.sku}-${base.n_entrega}`
     const prev = existentesPorId.get(base.id_entrega)
     const editable = {}
     for (const col of EDITABLE_ON_APP) {
