@@ -8,6 +8,7 @@ import Recordatorio from './Recordatorio'
 import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
+import ExportAlmacenButton from './ExportAlmacenButton'
 import Login from './Login'
 import './App.css'
 
@@ -260,6 +261,7 @@ export default function App() {
             {esEditor && <ImportButton onDone={cargar} />}
             {esEditor && <ImportIngresosButton onDone={cargar} />}
             <ExportButton />
+            <ExportAlmacenButton />
             <button className="btn" onClick={() => setMostrarRecordatorio(true)}>Recordatorio proveedor</button>
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
