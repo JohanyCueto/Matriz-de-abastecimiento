@@ -42,6 +42,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
 
+  const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
   const [fEst, setFEst] = useState('')
   const [fGes, setFGes] = useState('')
@@ -69,6 +70,14 @@ export default function App() {
   // persona. Por eso se compara el id de usuario, no el objeto sesion
   // completo, para no recargar todo y que la pantalla no parpadee.
   useEffect(() => { if (sesion) cargar() }, [sesion?.user?.id])
+
+  // Con ~500 filas, filtrar y redibujar la tabla en cada tecla se siente
+  // trabado. Se espera un momento sin escribir antes de aplicar la
+  // busqueda, para que el cuadro de texto responda al instante.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 250)
+    return () => clearTimeout(t)
+  }, [qInput])
 
   function actualizarFila(id, patch) {
     setRows(prev => withEntregas(prev.map(r => r.id_entrega === id ? enrich({ ...r, ...patch }) : r).map(r => ({ ...r }))))
@@ -146,7 +155,7 @@ export default function App() {
   }
 
   function limpiar() {
-    setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes('')
+    setQInput(''); setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes('')
     setQuick(''); setSoloTol(false)
   }
 
@@ -235,7 +244,7 @@ export default function App() {
           </div>
 
           <div className="bar">
-            <input type="text" placeholder="Buscar por OC, SKU, descripcion o proveedor" value={q} onChange={e => setQ(e.target.value)} />
+            <input type="text" placeholder="Buscar por OC, SKU, descripcion o proveedor" value={qInput} onChange={e => setQInput(e.target.value)} />
             <select value={fEst} onChange={e => setFEst(e.target.value)}>
               <option value="">Todos los estados</option>
               {CAT_EST.map(v => <option key={v} value={v}>{v}</option>)}
