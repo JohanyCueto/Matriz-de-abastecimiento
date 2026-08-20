@@ -8,9 +8,10 @@ destino (`tbl_IngresosProgramados.xlsx`, hoja `ProgramacionOC`), mismas
 columnas, mismo "Pendiente revisión" como estado de carga.
 
 Está basado en un solo PDF de ejemplo (OI 2600002272, proveedor EMPACANDO
-S.A.S., 1 ítem con 1 entrega). Donde el diseño depende de algo que ese PDF
-no muestra (varios ítems, varias entregas por ítem), lo marco como
-**pendiente de confirmar** — ver la sección final.
+S.A.S., 1 ítem con 1 entrega). Johany ya confirmó varias decisiones de
+diseño (ver "Decisiones confirmadas" al final); lo único que sigue abierto
+es si una OI puede traer más de un ítem/SKU, porque el ejemplo solo muestra
+uno.
 
 ## Estructura del documento OI (según el ejemplo)
 
@@ -29,9 +30,9 @@ Almacen Destino: AME CUARENTENA ALMACEN M+I DE GRAN VOLUMEN
 EXW  US$  17,370.00
 ```
 
-Cada ítem trae su fila de código/cantidad/precio, y debajo una o más líneas
-de entrega ("1ra.Entrega", "2da.Entrega", ...) con fecha y cantidad de esa
-entrega puntual.
+Cada ítem trae su fila de código/cantidad/precio, y debajo una línea de
+entrega ("1ra.Entrega") con fecha y cantidad — a diferencia de la OC, en la
+OI siempre es una sola entrega por ítem, nunca varias.
 
 ## Patrones a nivel de cabecera (una sola vez por PDF)
 
@@ -40,13 +41,13 @@ mediante expresión regular" / "Text - Parse text"), con grupos con nombre.
 
 | Campo | Patrón | Columna en `ProgramacionOC` |
 |---|---|---|
-| N° de OI | `Orden de Importacion Nro\.\s*:\s*(?<numeroOI>\d+)` | **OC** (ver decisión abajo) |
+| N° de OI | `Orden de Importacion Nro\.\s*:\s*(?<numeroOI>\d+)` | **OC** (confirmado: la OI va en la misma columna) |
 | Fecha de emisión | `Fec\.\s*Emision\s*(?<fechaEmision>\d{2}/\d{2}/\d{4})` | Fecha emisión OC |
 | Proveedor | `Proveedor\s*:\s*(?<proveedor>[^\r\n]+)` | Proveedor |
 | Comprador | `Comprador\s+(?<comprador>.+?)(?=\r?\n\|Cond\.\|R\.U\.C\.\|$)` | Comprador |
 | Condición de pago | `Cond\.\s*de\s*Pago\s*:\s*(?<condicionPago>.+?)(?=\r?\n\|Pais\|F\.\s*de\s*Pago\|$)` | Condición de pago |
 | Almacén destino | `Almacen\s*Destino\s*:\s*(?<almacenDestino>[^\r\n]+)` | Almacén destino |
-| Moneda (símbolo) | `(?<simboloMoneda>US\$\|S/\.?)` | Moneda *(traducir símbolo → texto: "US$"→"USD", "S/"→"PEN", con un If-Else después del regex, igual que probablemente ya hace el flujo de OC)* |
+| Moneda (símbolo) | `(?<simboloMoneda>US\$\|S/\.?\|€\|EUR)` | Moneda *(traducir símbolo → texto: "US$"→"USD", "S/"→"PEN", "€"/"EUR"→"EUR", con un If-Else después del regex)* |
 
 Notas:
 
@@ -64,6 +65,10 @@ Notas:
   columna equivalente en `ProgramacionOC`. Los dejo fuera del mapeo; si
   Johany los quiere guardar, la opción más simple es meterlos en
   "Observaciones" al crear la fila.
+- **Moneda:** Johany confirmó que las OI casi siempre vienen en dólares, y
+  rara vez en euros — nunca en soles. El patrón incluye "S/" solo por si
+  algún proveedor extranjero llegara a facturar así, pero en la práctica
+  solo debería activarse "US$" o "€"/"EUR".
 
 ## Patrón por ítem (se repite, uno por SKU dentro del PDF)
 
@@ -91,19 +96,26 @@ pero si algún ítem tiene una descripción que ocupe dos líneas (pasa en
 otros ERPs cuando el nombre del producto es largo), este patrón no la va a
 capturar completa. Con un solo ítem de ejemplo no hay forma de saberlo.
 
-## Patrón por entrega (se repite, uno por cada "N.Entrega" bajo un ítem)
+## Patrón de entrega (una por ítem — las OI no traen entregas parciales)
+
+Johany confirmó que, a diferencia de las OC, **una OI siempre llega en una
+sola entrega por ítem** (nunca hay "1ra.Entrega" / "2da.Entrega" para el
+mismo SKU). Eso simplifica el flujo: no hace falta un loop anidado de
+entregas por ítem, el ordinal siempre va a ser 1 y el patrón solo se corre
+una vez por bloque de ítem.
 
 ```
 (?m)^\s*(?<ordinal>\d+)[a-zA-Zº°]{0,3}\.?\s*Entrega\s+(?<fechaEntrega>\d{2}/\d{2}/\d{4})\s+(?<cantidadEntrega>[\d,]+\.\d+)\s+(?<umEntrega>\w+)
 ```
 
-Cubre "1ra.Entrega", "2da.Entrega", "3ra.Entrega", etc. (el sufijo en
-español varía y `[a-zA-Zº°]{0,3}` lo absorbe sin tener que enumerar cada
-caso).
+Se deja `ordinal` capturado (en vez de asumir literal "1ra.Entrega") solo
+como resguardo — si algún día aparece una OI con más de una entrega, el
+dato queda disponible sin tener que rediseñar el patrón, pero por ahora se
+puede tratar como si siempre fuera E01.
 
 Mapeo:
 
-- `ordinal` → **N° entrega** (formatear como en OC, ej. `"E" & Text(ordinal, "00")` → "E01") y también → **Orden entrega**
+- `"E" & Text(ordinal, "00")` (en la práctica siempre "E01") → **N° entrega**, y `ordinal` → **Orden entrega**
 - `fechaEntrega` → **Fecha programada de ingreso**
 - `cantidadEntrega` → **Cant. Programada**
 - `cantidadEntrega * precioUnitario` (calculado, no regex) → **Valor entrega**
@@ -112,39 +124,39 @@ Como cada línea de entrega va inmediatamente debajo de su ítem, en el flujo
 conviene recortar el texto en bloques por ítem primero (desde una
 coincidencia de "código de ítem" hasta la siguiente, o hasta "Almacen
 Destino:") y correr el patrón de entrega solo dentro de ese bloque — así
-cada entrega queda asociada al ítem correcto aunque haya varios ítems con
-varias entregas cada uno.
+cada entrega queda asociada al ítem correcto si la OI trae varios SKU.
 
-## Decisiones a confirmar con Johany antes de dejarlo en producción
+## Decisiones confirmadas por Johany
 
-1. **¿El número de OI va en la columna "OC"?** Es la forma más simple de
-   reusar el mismo flujo de cálculo (`programacion_oc` cruza por `oc` +
-   `sku` contra `ingresos_sistema`), y no hay problema de tamaño de dato
-   (la columna es `bigint` en Supabase, así que 2,600,002,272 entra sin
-   problema). Pero mezcla en una sola columna dos numeraciones distintas
-   (OC y OI). Si Johany prefiere distinguirlas a simple vista en el Excel,
-   la alternativa es agregar una columna "Tipo documento" (OC/OI) — pero
-   eso sí requiere tocar `PROGRAMACION_COLUMNS` en `app/src/lib/schema.js`
-   y el esquema de Supabase, no es solo cambio de regex.
-2. **Composición del "ID entrega".** Es la llave con la que la app hace
-   `upsert` (`app/src/lib/importer.js`), así que un choque entre un ID de
-   OC y un ID de OI pisaría datos. Recomiendo usar el mismo formato que ya
-   usa el flujo de OC pero con un prefijo que marque el origen, ej.
-   `"OI-" & numeroOI & "-" & sku & "-E" & Text(ordinal, "00")`. Hace falta
-   revisar cómo arma el ID el flujo de OC actual para calcar el mismo
-   formato (separadores, ceros a la izquierda) y solo cambiar el prefijo.
-3. **PDF de ejemplo con un solo ítem y una sola entrega.** Los patrones de
-   ítem y entrega están escritos para repetirse (loop de matches), pero
-   nunca se probaron contra un OI real con más de un SKU o con un SKU que
-   tenga varias entregas (E01, E02...). Antes de correr el flujo en
-   producción conviene probarlo con un PDF así — si Johany tiene uno a
-   mano, compartirlo permite ajustar los patrones con un caso real en vez
-   de una suposición.
-4. **Moneda.** El PDF de ejemplo está en dólares (US$). No se sabe si
-   existen OI de este proveedor en soles u otra moneda; el patrón de
-   moneda cubre "US$" y "S/", pero convendría confirmar si el flujo de OC
-   ya maneja esto con lógica fija (ej. "todas las OC son en USD") para
-   copiar el mismo criterio.
+1. **El número de OI va en la columna "OC".** Reusa el mismo cruce que ya
+   hace `programacion_oc` (por `oc` + `sku` contra `ingresos_sistema`), y no
+   hay problema de tamaño de dato: la columna es `bigint` en Supabase, así
+   que 2,600,002,272 entra sin problema.
+2. **"ID entrega" de OI: mismo cálculo que en OC, pero empieza con "OI".**
+   Es decir, se mantiene la lógica de armar el ID a partir de número de
+   documento + SKU + entrega que ya usa el flujo de OC, solo que el
+   documento se identifica como OI en vez de OC. Con entrega única
+   confirmada (punto siguiente), en la práctica queda:
+   `"OI" & numeroOI & "-" & sku & "-E01"`. Falta un solo detalle operativo:
+   revisar el separador y los ceros a la izquierda exactos que usa hoy el
+   flujo de OC (ej. si pone guion después de "OC" o no) para que el formato
+   quede idéntico salvo por el prefijo.
+3. **Una OI siempre trae una sola entrega por ítem** (nunca "1ra./2da.
+   Entrega" para el mismo SKU, a diferencia de la OC). El patrón de entrega
+   ya está simplificado con esto en mente — ver la sección anterior.
+4. **Moneda: casi siempre dólares, rara vez euros, nunca soles.** El patrón
+   de moneda ya cubre "US$" y "€"/"EUR".
+
+### Lo único que sigue abierto
+
+**¿Una OI puede traer más de un ítem/SKU?** El PDF de ejemplo solo tiene
+uno. El patrón de ítem está escrito para repetirse (loop de "todas las
+coincidencias"), pero nunca se probó contra una OI real con varios SKU. Si
+Johany tiene un ejemplo así a mano, compartirlo permite confirmar el
+patrón con un caso real antes de soltar el flujo en producción; si las OI
+de EMPACANDO (y de otros proveedores) siempre traen un solo ítem, el loop
+de ítems no hace falta y se puede simplificar a una sola extracción por
+PDF.
 
 ## Cómo enchufarlo en Power Automate Desktop
 
