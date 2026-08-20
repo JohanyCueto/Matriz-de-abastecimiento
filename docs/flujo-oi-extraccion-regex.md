@@ -8,10 +8,10 @@ destino (`tbl_IngresosProgramados.xlsx`, hoja `ProgramacionOC`), mismas
 columnas, mismo "Pendiente revisión" como estado de carga.
 
 Está basado en un solo PDF de ejemplo (OI 2600002272, proveedor EMPACANDO
-S.A.S., 1 ítem con 1 entrega). Johany ya confirmó varias decisiones de
-diseño (ver "Decisiones confirmadas" al final); lo único que sigue abierto
-es si una OI puede traer más de un ítem/SKU, porque el ejemplo solo muestra
-uno.
+S.A.S., 1 ítem con 1 entrega), pero Johany confirmó que una OI sí puede
+traer varios ítems/SKU (el ejemplo solo muestra uno porque esa OI puntual
+tenía uno). Todas las decisiones de diseño quedaron confirmadas — ver
+"Decisiones confirmadas" al final.
 
 ## Estructura del documento OI (según el ejemplo)
 
@@ -154,17 +154,24 @@ cada entrega queda asociada al ítem correcto si la OI trae varios SKU.
    para el mismo SKU, se procesa sin cambios.
 4. **Moneda: casi siempre dólares, rara vez euros, nunca soles.** El patrón
    de moneda ya cubre "US$" y "€"/"EUR".
+5. **Una OI sí puede traer varios ítems/SKU**, no solo el caso de un ítem
+   del PDF de ejemplo. Esto confirma que el patrón de ítem tiene que
+   quedarse como loop de "todas las coincidencias" (ya estaba escrito así)
+   y, más importante, que el recorte del texto en bloques por ítem antes de
+   buscar las entregas (mencionado al final de la sección anterior) no es
+   opcional: sin eso, una OI con 2+ ítems mezclaría las entregas del
+   ítem equivocado.
 
-### Lo único que sigue abierto
+### Qué falta para probarlo con confianza
 
-**¿Una OI puede traer más de un ítem/SKU?** El PDF de ejemplo solo tiene
-uno. El patrón de ítem está escrito para repetirse (loop de "todas las
-coincidencias"), pero nunca se probó contra una OI real con varios SKU. Si
-Johany tiene un ejemplo así a mano, compartirlo permite confirmar el
-patrón con un caso real antes de soltar el flujo en producción; si las OI
-de EMPACANDO (y de otros proveedores) siempre traen un solo ítem, el loop
-de ítems no hace falta y se puede simplificar a una sola extracción por
-PDF.
+El diseño ya cubre el caso general (varios ítems, cada uno con una o más
+entregas), pero sigue basado en un solo PDF real que tenía un ítem y una
+entrega. Antes de soltar el flujo en producción, lo más seguro es probarlo
+contra un PDF real con varios ítems (y, si es posible, alguno con más de
+una entrega) para confirmar que el recorte por bloques y los patrones no
+se rompen con separaciones o formatos que el ejemplo actual no muestra. Si
+Johany tiene uno a mano, compartirlo ayuda a cerrar esto con un caso real
+en vez de una suposición.
 
 ## Cómo enchufarlo en Power Automate Desktop
 
