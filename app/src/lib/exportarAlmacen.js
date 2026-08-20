@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { supabase } from './supabaseClient'
+import { TOLERANCIA_MARGEN } from './derive'
 
 function descargarBlob(blob, nombre) {
   const url = URL.createObjectURL(blob)
@@ -18,11 +19,23 @@ function descargarBlob(blob, nombre) {
 // hoy todo lo que se maneja se cuenta asi.
 export async function exportarCuadroAlmacen() {
   const { data, error } = await supabase.from('programacion_oc')
-    .select('sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,saldo_pendiente,estado_gestion')
+    .select('sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,cant_ingresada,saldo_pendiente,estado_gestion')
   if (error) throw error
+
+  // Para almacen lo que importa es si ya llego lo suficiente, no si Johany
+  // ya cerro la linea de gestion a mano (eso puede tardar en pasar). Si el
+  // saldo que falta esta dentro del margen de tolerancia, se considera
+  // practicamente llegada y no aparece en el cuadro, aunque en la app
+  // siga como "Pendiente" hasta que ella la cierre.
+  const dentroDeTolerancia = r => {
+    const prog = r.cant_programada || 0
+    const saldo = r.saldo_pendiente || 0
+    return prog > 0 && saldo > 0 && saldo <= prog * TOLERANCIA_MARGEN
+  }
 
   const pendientes = data
     .filter(r => (r.saldo_pendiente || 0) > 0 && r.estado_gestion !== 'Cerrado')
+    .filter(r => !dentroDeTolerancia(r))
     .sort((a, b) => (a.fecha_programada_ingreso || '').localeCompare(b.fecha_programada_ingreso || ''))
 
   const wb = new ExcelJS.Workbook()
