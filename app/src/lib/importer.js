@@ -165,10 +165,27 @@ export async function importarExcel(file, onStep) {
     // llena (a veces esta vacia): la armamos nosotros mismos con OC, SKU
     // y N. entrega, que es exactamente como esta armada cuando si viene.
     base.id_entrega = `${base.oc}-${base.sku}-${base.n_entrega}`
+    // Tampoco confiamos en la columna "Orden entrega" del Excel (esta pensada
+    // para salir de una formula sobre N. entrega, pero a veces viene vacia o
+    // repetida). La calculamos nosotros mismos para que el reparto FIFO de
+    // ingresos siempre llene primero la E01, nunca al reves.
+    base.orden_entrega = parseInt(String(base.n_entrega || '').replace(/\D/g, ''), 10) || null
     const prev = existentesPorId.get(base.id_entrega)
     const editable = {}
     for (const col of EDITABLE_ON_APP) {
-      editable[col.field] = prev ? prev[col.field] : convertCell(col.type, raw[col.header])
+      if (col.field === 'estado_gestion') {
+        // El estado de gestion es un campo que solo debe moverlo la gente
+        // desde el panel de la app (En seguimiento / Reprogramado / Cerrado).
+        // No se toma nunca del Excel, ni siquiera en una fila nueva: si se
+        // tomara, un "Cerrado" viejo o mal puesto en su archivo original se
+        // quedaria pegado para siempre, aunque la entrega siga con saldo
+        // pendiente. Si queda vacio, la app ya calcula sola un estado
+        // razonable (Cerrado si no queda saldo, Atrasado si se paso la
+        // fecha, o "En seguimiento" por defecto) en derive.js/exporter.js.
+        editable.estado_gestion = prev ? prev.estado_gestion : null
+      } else {
+        editable[col.field] = prev ? prev[col.field] : convertCell(col.type, raw[col.header])
+      }
     }
     return {
       ...base,
