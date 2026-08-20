@@ -13,6 +13,27 @@ traer varios ítems/SKU (el ejemplo solo muestra uno porque esa OI puntual
 tenía uno). Todas las decisiones de diseño quedaron confirmadas — ver
 "Decisiones confirmadas" al final.
 
+**Actualizado tras ver el flujo real de OC en Power Automate Desktop**
+(capturas de pantalla de las 48 acciones): esto confirmó varias cosas y
+corrigió otras que este documento había asumido sin verlo. Los cambios más
+importantes:
+
+- El flujo de OC **no arma "ID entrega" con una acción de Power Automate**
+  — esa columna (y "Valor entrega") son fórmulas que ya existen en el
+  Excel, calculadas solas a partir de lo que el flujo sí escribe (OC, SKU,
+  N° entrega). El flujo de OI no necesita ninguna acción para esto: solo
+  tiene que escribir en las mismas columnas B, J y O, y la fórmula hace el
+  resto. Ver la sección "ID entrega y Valor entrega" más abajo.
+- El número de OC se extrae con el patrón `(26|27)\d{8}` — el mismo formato
+  de 10 dígitos que tiene el número de OI (2600002272). Johany confirmó que
+  la numeración de documentos en su ERP es global (nunca se repite el mismo
+  número entre una OC y una OI), así que no hace falta ningún prefijo ni
+  tocar la fórmula de "ID entrega": el número solo ya es único.
+- El flujo de OC deja "Comprador" y "Almacén destino" en blanco (se
+  completan a mano en la revisión). Johany pidió que el flujo de OI sí los
+  capture automáticamente, ya que su PDF los trae limpios y etiquetados —
+  quedan agregados al mapeo de cabecera.
+
 ## Estructura del documento OI (según el ejemplo)
 
 ```
@@ -44,13 +65,13 @@ mediante expresión regular" / "Text - Parse text"), con grupos con nombre.
 
 | Campo | Patrón | Columna en `ProgramacionOC` |
 |---|---|---|
-| N° de OI | `Orden de Importacion Nro\.\s*:\s*(?<numeroOI>\d+)` | **OC** (confirmado: la OI va en la misma columna) |
-| Fecha de emisión | `Fec\.\s*Emision\s*(?<fechaEmision>\d{2}/\d{2}/\d{4})` | Fecha emisión OC |
-| Proveedor | `Proveedor\s*:\s*(?<proveedor>[^\r\n]+)` | Proveedor |
-| Comprador | `Comprador\s+(?<comprador>.+?)(?=\r?\n\|Cond\.\|R\.U\.C\.\|$)` | Comprador |
-| Condición de pago | `Cond\.\s*de\s*Pago\s*:\s*(?<condicionPago>.+?)(?=\r?\n\|Pais\|F\.\s*de\s*Pago\|$)` | Condición de pago |
-| Almacén destino | `Almacen\s*Destino\s*:\s*(?<almacenDestino>[^\r\n]+)` | Almacén destino |
-| Moneda (símbolo) | `(?<simboloMoneda>US\$\|S/\.?\|€\|EUR)` | Moneda *(traducir símbolo → texto: "US$"→"USD", "S/"→"PEN", "€"/"EUR"→"EUR", con un If-Else después del regex)* |
+| N° de OI | `Orden de Importacion Nro\.\s*:\s*(?<numeroOI>\d+)` | **B — OC** (confirmado: la OI va en la misma columna, numeración global, sin riesgo de choque) |
+| Fecha de emisión | `Fec\.\s*Emision\s*(?<fechaEmision>\d{2}/\d{2}/\d{4})` | **A** — Fecha emisión OC |
+| Proveedor | `Proveedor\s*:\s*(?<proveedor>[^\r\n]+)` | **C** — Proveedor |
+| Comprador | `Comprador\s+(?<comprador>.+?)(?=\r?\n\|Cond\.\|R\.U\.C\.\|$)` | **D** — Comprador *(OC lo deja en blanco; Johany pidió capturarlo para OI)* |
+| Condición de pago | `Cond\.\s*de\s*Pago\s*:\s*(?<condicionPagoTexto>.+?)(?=\r?\n\|Pais\|F\.\s*de\s*Pago\|$)`, y sobre ese resultado un segundo análisis con `(CREDITO\s+\d+\s+DIAS\|CRÉDITO\s+\d+\s+DÍAS\|CONTADO)` para quedarse con la forma estructurada — igual que hace el flujo de OC, en vez de guardar el texto crudo | **F** — Condición de pago |
+| Almacén destino | `Almacen\s*Destino\s*:\s*(?<almacenDestino>[^\r\n]+)` | **T** — Almacén destino *(OC lo deja en blanco; Johany pidió capturarlo para OI)* |
+| Moneda (símbolo) | `(?<simboloMoneda>US\$\|S/\.?\|€\|EUR)` | **E** — Moneda *(traducir símbolo → texto: "US$"→"USD", "S/"→"PEN", "€"/"EUR"→"EUR", con un If-Else después del regex — mismo criterio que usa OC, que también traduce el símbolo antes de escribirlo)* |
 
 Notas:
 
@@ -85,12 +106,14 @@ la OC.
 
 Mapeo:
 
-- `sku` → **SKU**
-- `descripcion` → **Descripción**
-- `precioUnitario` → **Precio unitario**
+- `sku` → **J — SKU**
+- `descripcion` → **K — Descripción**
+- `precioUnitario` → **L — Precio unitario**
 - `cantidad` (cantidad total del ítem en la OI) — **no** es directamente
   "Cant. Programada": esa columna es por entrega, no por ítem. Ver el
-  patrón de entrega abajo.
+  patrón de entrega abajo. *(Confirmado contra el flujo de OC: ahí también
+  "Cant. Programada" sale de la línea de entrega, no de la línea del
+  ítem.)*
 
 Ojo con `descripcion`: en el ejemplo la descripción trae pegada la palabra
 "Ovulo" (forma farmacéutica) antes del U/M "und" — el `.+?` no greedy más el
@@ -119,16 +142,43 @@ caso).
 
 Mapeo:
 
-- `ordinal` → **Orden entrega**, y `"E" & Text(ordinal, "00")` → **N° entrega** (ej. "E01", "E02")
-- `fechaEntrega` → **Fecha programada de ingreso**
-- `cantidadEntrega` → **Cant. Programada**
-- `cantidadEntrega * precioUnitario` (calculado, no regex) → **Valor entrega**
+- `"E" & Text(ordinal, "00")` → **O — N° entrega** (ej. "E01", "E02") —
+  igual que OC, que también escribe el código de entrega ya formateado
+  como "E01" en esta columna (aunque en el PDF de OC aparece literal como
+  "(E01)" y en el de OI hay que armarlo a partir del ordinal de "1ra.",
+  "2da.", etc.)
+- `fechaEntrega` → **Q — Fecha programada de ingreso**
+- `cantidadEntrega` → **M — Cant. Programada**
+- **Orden entrega (W)** y **Valor entrega (N)** — el flujo de OC no las
+  escribe (ver la sección siguiente); OI hace lo mismo, por consistencia.
 
 Como cada línea de entrega va inmediatamente debajo de su ítem, en el flujo
 conviene recortar el texto en bloques por ítem primero (desde una
 coincidencia de "código de ítem" hasta la siguiente, o hasta "Almacen
 Destino:") y correr el patrón de entrega solo dentro de ese bloque — así
 cada entrega queda asociada al ítem correcto si la OI trae varios SKU.
+*(Esto es exactamente lo que hace el flujo de OC: recorta el texto con
+`(?m)^\d{2}\s\d{9}.*?(?=^\d{2}\s\d{9}|Almacen Destino:)` y corre el patrón
+de entrega dentro de cada bloque.)*
+
+## ID entrega y Valor entrega: no los escribe Power Automate
+
+Revisando las 48 acciones del flujo de OC, las columnas **P (ID entrega)**
+y **N (Valor entrega)** nunca aparecen en ninguna acción "Escribir en la
+hoja de cálculo de Excel". Son **fórmulas que ya existen en el Excel**
+(`tbl_IngresosProgramados.xlsx`), calculadas a partir de las columnas que
+sí llena el flujo — probablemente algo como `=B&"-"&J&"-"&O` para el ID y
+`=L*M` para el valor.
+
+Esto simplifica el flujo de OI: no hace falta ninguna acción de
+"Establecer variable" ni concatenación para armar el ID. Basta con escribir
+en las columnas B (OC/OI), J (SKU) y O (N° entrega) igual que hace OC, y la
+fórmula de la hoja arma el ID sola.
+
+Johany confirmó que la numeración de documentos en el ERP es **global**
+(un número de OC y uno de OI nunca coinciden), así que no hace falta tocar
+la fórmula ni agregar ningún prefijo "OI-" — el número del documento ya es
+único por sí solo, sea OC o OI.
 
 ## Decisiones confirmadas por Johany
 
@@ -136,17 +186,13 @@ cada entrega queda asociada al ítem correcto si la OI trae varios SKU.
    hace `programacion_oc` (por `oc` + `sku` contra `ingresos_sistema`), y no
    hay problema de tamaño de dato: la columna es `bigint` en Supabase, así
    que 2,600,002,272 entra sin problema.
-2. **"ID entrega" de OI: mismo cálculo que en OC, pero empieza con "OI".**
-   Es decir, se mantiene la lógica de armar el ID a partir de número de
-   documento + SKU + entrega que ya usa el flujo de OC, solo que el
-   documento se identifica como OI en vez de OC:
-   `"OI" & numeroOI & "-" & sku & "-E" & Text(ordinal, "00")` (ej.
-   "OI2600002272-140209005-E01"). Como la entrega puede repetirse (punto
-   siguiente), el número de entrega tiene que ir sí o sí en el ID —igual
-   que en OC— para no pisar una entrega con otra del mismo ítem. Falta un
-   solo detalle operativo: revisar el separador y los ceros a la izquierda
-   exactos que usa hoy el flujo de OC para que el formato quede idéntico
-   salvo por el prefijo.
+2. **"ID entrega" y "Valor entrega" no se calculan en Power Automate — son
+   fórmulas del Excel.** Al revisar el flujo real de OC se confirmó que
+   esas dos columnas nunca se escriben desde PAD; se recalculan solas a
+   partir de OC/SKU/N° entrega. Johany confirmó que la numeración de
+   documentos del ERP es global (una OC y una OI nunca comparten número),
+   así que no hace falta ningún prefijo "OI-" ni tocar la fórmula — queda
+   sin cambios, ver la sección "ID entrega y Valor entrega" más arriba.
 3. **Lo normal es una sola entrega por ítem, pero ocasionalmente puede venir
    partida en varias** (Johany lo confirmó explícitamente). El patrón de
    entrega no asume una única "1ra.Entrega": queda como loop repetible
@@ -161,6 +207,11 @@ cada entrega queda asociada al ítem correcto si la OI trae varios SKU.
    buscar las entregas (mencionado al final de la sección anterior) no es
    opcional: sin eso, una OI con 2+ ítems mezclaría las entregas del
    ítem equivocado.
+6. **El flujo de OI sí debe capturar "Comprador" y "Almacén destino"**,
+   aunque el flujo de OC los deje en blanco. Johany prefirió aprovechar que
+   el PDF de OI los trae limpios y etiquetados en vez de mantener paridad
+   estricta con OC en este punto — quedan en el mapeo de cabecera con sus
+   propios patrones.
 
 ### Qué falta para probarlo con confianza
 
