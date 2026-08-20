@@ -30,9 +30,12 @@ Almacen Destino: AME CUARENTENA ALMACEN M+I DE GRAN VOLUMEN
 EXW  US$  17,370.00
 ```
 
-Cada ítem trae su fila de código/cantidad/precio, y debajo una línea de
-entrega ("1ra.Entrega") con fecha y cantidad — a diferencia de la OC, en la
-OI siempre es una sola entrega por ítem, nunca varias.
+Cada ítem trae su fila de código/cantidad/precio, y debajo una o más líneas
+de entrega ("1ra.Entrega", "2da.Entrega", ...) con fecha y cantidad. Lo
+normal en una OI es que sea una sola entrega por ítem, pero Johany aclaró
+que ocasionalmente puede venir partida en varias — así que el patrón sigue
+siendo el mismo loop repetible que usa la OC, no uno que asuma una sola
+entrega.
 
 ## Patrones a nivel de cabecera (una sola vez por PDF)
 
@@ -96,26 +99,27 @@ pero si algún ítem tiene una descripción que ocupe dos líneas (pasa en
 otros ERPs cuando el nombre del producto es largo), este patrón no la va a
 capturar completa. Con un solo ítem de ejemplo no hay forma de saberlo.
 
-## Patrón de entrega (una por ítem — las OI no traen entregas parciales)
+## Patrón de entrega (se repite, uno por cada "N.Entrega" bajo un ítem)
 
-Johany confirmó que, a diferencia de las OC, **una OI siempre llega en una
-sola entrega por ítem** (nunca hay "1ra.Entrega" / "2da.Entrega" para el
-mismo SKU). Eso simplifica el flujo: no hace falta un loop anidado de
-entregas por ítem, el ordinal siempre va a ser 1 y el patrón solo se corre
-una vez por bloque de ítem.
+Lo normal es una sola entrega por ítem, pero Johany avisó que **igual
+podría presentarse el caso de una OI partida en varias entregas**, así que
+el patrón se mantiene como loop de "todas las coincidencias" — igual que en
+la OC — en vez de asumir un único E01. Cuando solo hay una entrega, el loop
+simplemente encuentra una sola coincidencia y se comporta igual que si
+estuviera "hardcodeado"; la diferencia es que no se rompe el día que
+aparezca una OI con dos o tres.
 
 ```
 (?m)^\s*(?<ordinal>\d+)[a-zA-Zº°]{0,3}\.?\s*Entrega\s+(?<fechaEntrega>\d{2}/\d{2}/\d{4})\s+(?<cantidadEntrega>[\d,]+\.\d+)\s+(?<umEntrega>\w+)
 ```
 
-Se deja `ordinal` capturado (en vez de asumir literal "1ra.Entrega") solo
-como resguardo — si algún día aparece una OI con más de una entrega, el
-dato queda disponible sin tener que rediseñar el patrón, pero por ahora se
-puede tratar como si siempre fuera E01.
+Cubre "1ra.Entrega", "2da.Entrega", "3ra.Entrega", etc. (el sufijo en
+español varía y `[a-zA-Zº°]{0,3}` lo absorbe sin tener que enumerar cada
+caso).
 
 Mapeo:
 
-- `"E" & Text(ordinal, "00")` (en la práctica siempre "E01") → **N° entrega**, y `ordinal` → **Orden entrega**
+- `ordinal` → **Orden entrega**, y `"E" & Text(ordinal, "00")` → **N° entrega** (ej. "E01", "E02")
 - `fechaEntrega` → **Fecha programada de ingreso**
 - `cantidadEntrega` → **Cant. Programada**
 - `cantidadEntrega * precioUnitario` (calculado, no regex) → **Valor entrega**
@@ -135,15 +139,19 @@ cada entrega queda asociada al ítem correcto si la OI trae varios SKU.
 2. **"ID entrega" de OI: mismo cálculo que en OC, pero empieza con "OI".**
    Es decir, se mantiene la lógica de armar el ID a partir de número de
    documento + SKU + entrega que ya usa el flujo de OC, solo que el
-   documento se identifica como OI en vez de OC. Con entrega única
-   confirmada (punto siguiente), en la práctica queda:
-   `"OI" & numeroOI & "-" & sku & "-E01"`. Falta un solo detalle operativo:
-   revisar el separador y los ceros a la izquierda exactos que usa hoy el
-   flujo de OC (ej. si pone guion después de "OC" o no) para que el formato
-   quede idéntico salvo por el prefijo.
-3. **Una OI siempre trae una sola entrega por ítem** (nunca "1ra./2da.
-   Entrega" para el mismo SKU, a diferencia de la OC). El patrón de entrega
-   ya está simplificado con esto en mente — ver la sección anterior.
+   documento se identifica como OI en vez de OC:
+   `"OI" & numeroOI & "-" & sku & "-E" & Text(ordinal, "00")` (ej.
+   "OI2600002272-140209005-E01"). Como la entrega puede repetirse (punto
+   siguiente), el número de entrega tiene que ir sí o sí en el ID —igual
+   que en OC— para no pisar una entrega con otra del mismo ítem. Falta un
+   solo detalle operativo: revisar el separador y los ceros a la izquierda
+   exactos que usa hoy el flujo de OC para que el formato quede idéntico
+   salvo por el prefijo.
+3. **Lo normal es una sola entrega por ítem, pero ocasionalmente puede venir
+   partida en varias** (Johany lo confirmó explícitamente). El patrón de
+   entrega no asume una única "1ra.Entrega": queda como loop repetible
+   igual que en OC, así que si algún día aparece una OI con "1ra." y "2da."
+   para el mismo SKU, se procesa sin cambios.
 4. **Moneda: casi siempre dólares, rara vez euros, nunca soles.** El patrón
    de moneda ya cubre "US$" y "€"/"EUR".
 
