@@ -70,5 +70,12 @@ export function enrich(r) {
   else sem2 = 'enfecha'
   const hist = Array.isArray(r.historial) ? r.historial : []
   const fprog0 = hist.length ? hist[0].de : r.fecha_programada_ingreso
-  return { ...r, abierto, tol, dd, avance, desv, sem2, hist, fprog0 }
+  // La Gestion se recalcula sola, igual que los Dias: si ya no queda nada
+  // pendiente (o alguien la cerro a mano), se ve Cerrado; si se paso la
+  // fecha y sigue con saldo, Atrasado; si no, se respeta lo que haya
+  // dejado la gente (Reprogramado, etc.) o "En seguimiento" por defecto.
+  const estadoGestion = !abierto ? 'Cerrado'
+    : (dd != null && dd < 0) ? 'Atrasado'
+    : (r.estado_gestion || 'En seguimiento')
+  return { ...r, estado_gestion: estadoGestion, abierto, tol, dd, avance, desv, sem2, hist, fprog0 }
 }

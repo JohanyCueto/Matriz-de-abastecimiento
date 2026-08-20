@@ -51,6 +51,17 @@ export async function exportarExcel() {
       case 'dias_atraso': return { formula: `IF(${ref('fecha_real_ingreso')}="","",MAX(0,${ref('fecha_real_ingreso')}-${ref('fecha_programada_ingreso')}))` }
       case 'valor_ingresado': return { formula: `${ref('precio_unitario')}*${ref('cant_ingresada')}` }
       case 'valor_pendiente': return { formula: `${ref('precio_unitario')}*${ref('saldo_pendiente')}` }
+      case 'estado_gestion': {
+        // Misma correccion que en la app: si ya no hay saldo (o ya esta
+        // cerrada), se ve Cerrado; si se paso la fecha, Atrasado.
+        const abierto = (r.saldo_pendiente || 0) > 0 && r.estado_gestion !== 'Cerrado'
+        if (!abierto) return 'Cerrado'
+        if (r.fecha_programada_ingreso) {
+          const dd = Math.round((new Date(r.fecha_programada_ingreso + 'T00:00:00') - new Date()) / 864e5)
+          if (dd < 0) return 'Atrasado'
+        }
+        return r.estado_gestion || 'En seguimiento'
+      }
       default: {
         const v = r[field]
         return (type === 'date' && v) ? aFecha(v) : v
