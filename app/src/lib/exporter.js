@@ -51,6 +51,11 @@ export async function exportarExcel() {
       case 'dias_atraso': return { formula: `IF(${ref('fecha_real_ingreso')}="","",MAX(0,${ref('fecha_real_ingreso')}-${ref('fecha_programada_ingreso')}))` }
       case 'valor_ingresado': return { formula: `${ref('precio_unitario')}*${ref('cant_ingresada')}` }
       case 'valor_pendiente': return { formula: `${ref('precio_unitario')}*${ref('saldo_pendiente')}` }
+      case 'estado_ingreso':
+        // No se confia en el texto guardado (puede quedar un "Parcial"
+        // viejo de antes de fusionar ese estado con Pendiente): se calcula
+        // del saldo, igual que en la app.
+        return (r.saldo_pendiente || 0) > 0 ? 'Pendiente' : 'Completo'
       case 'estado_gestion': {
         // Misma correccion que en la app: si ya no hay saldo (o ya esta
         // cerrada), se ve Cerrado; si se paso la fecha, Atrasado.

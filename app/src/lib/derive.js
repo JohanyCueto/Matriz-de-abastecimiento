@@ -92,5 +92,9 @@ export function enrich(r) {
   const estadoGestion = !abierto ? 'Cerrado'
     : (dd != null && dd < 0) ? 'Atrasado'
     : (r.estado_gestion || 'En seguimiento')
-  return { ...r, estado_gestion: estadoGestion, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
+  // Igual que Gestion: si el dato guardado quedo viejo (por ejemplo un
+  // "Parcial" de antes de fusionar ese estado con Pendiente), no se
+  // confia en el valor de la base, se calcula solo del saldo actual.
+  const estadoIngreso = saldo > 0 ? 'Pendiente' : 'Completo'
+  return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
 }
