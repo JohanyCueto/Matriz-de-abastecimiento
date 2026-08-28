@@ -153,12 +153,16 @@ export async function importarExcel(file, onStep) {
   const wb = XLSX.read(buf, { type: 'array', cellDates: true })
 
   const shProg = wb.Sheets['ProgramacionOC']
-  const shIng = wb.Sheets['IngresosSistema']
-  if (!shProg || !shIng) {
-    throw new Error('El archivo no tiene las hojas "ProgramacionOC" e "IngresosSistema" esperadas.')
+  if (!shProg) {
+    throw new Error('El archivo no tiene la hoja "ProgramacionOC" esperada.')
   }
+  // La hoja "IngresosSistema" es opcional: el Excel que se descarga desde
+  // Exportar Excel (por ejemplo para agregar OC nuevas a mano) solo trae
+  // ProgramacionOC, y eso es valido, simplemente no hay ingresos nuevos
+  // que sumar en esta importacion.
+  const shIng = wb.Sheets['IngresosSistema']
   const rawProg = XLSX.utils.sheet_to_json(shProg, { defval: null })
-  const rawIng = XLSX.utils.sheet_to_json(shIng, { defval: null })
+  const rawIng = shIng ? XLSX.utils.sheet_to_json(shIng, { defval: null }) : []
 
   onStep?.('Revisando lo que ya tienes guardado...')
   const existentesProg = await fetchAll('programacion_oc',
