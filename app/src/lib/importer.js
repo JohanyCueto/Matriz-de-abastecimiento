@@ -9,10 +9,24 @@ const cleanText = v => {
 }
 const isoDate = v => {
   if (v == null || v === '') return null
-  const d = v instanceof Date ? v : new Date(v)
+  if (v instanceof Date) {
+    if (isNaN(v)) return null
+    const y = v.getFullYear(), m = String(v.getMonth() + 1).padStart(2, '0'), day = String(v.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  // Las filas que Johany agrega a mano a veces quedan fuera del formato de
+  // fecha de la tabla, y el Excel guarda "26/08/2026" como texto en vez de
+  // fecha. new Date() de JS no entiende dia/mes/año (lo confunde con el
+  // formato americano mes/dia/año y falla), asi que se parsea a mano.
+  const m = String(v).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (m) {
+    const [, d, mo, y] = m
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+  const d = new Date(v)
   if (isNaN(d)) return null
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  const y = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${mm}-${day}`
 }
 const toNumber = v => (v == null || v === '') ? null : Number(v)
 const toInt = v => (v == null || v === '') ? null : parseInt(v, 10)
