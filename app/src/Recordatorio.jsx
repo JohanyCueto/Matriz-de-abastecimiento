@@ -2,8 +2,12 @@ import { useMemo, useState } from 'react'
 import { fmt, fdate } from './lib/derive'
 
 // "2026-08" para el mes actual, "2026-09" si offset=1 (mes que viene), etc.
+// Primero se fija el dia en 1: si hoy es 31 y se suma un mes sin hacer esto,
+// Date intenta armar "31 de setiembre" (que no existe) y salta directo a
+// octubre, saltandose setiembre por completo.
 function claveMes(offset) {
   const d = new Date()
+  d.setDate(1)
   d.setMonth(d.getMonth() + offset)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
