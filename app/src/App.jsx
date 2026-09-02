@@ -9,6 +9,7 @@ import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
 import ExportAlmacenButton from './ExportAlmacenButton'
+import Explosion from './Explosion'
 import Login from './Login'
 import './App.css'
 
@@ -42,6 +43,7 @@ export default function App() {
   const [err, setErr] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
+  const [vista, setVista] = useState('oc')
 
   const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
@@ -231,6 +233,12 @@ export default function App() {
         </div>
       </header>
 
+      <div className="bar" style={{ marginBottom: 14 }}>
+        <button className={`btn ${vista === 'oc' ? 'act' : ''}`} onClick={() => setVista('oc')}>Seguimiento OC</button>
+        <button className={`btn ${vista === 'explosion' ? 'act' : ''}`} onClick={() => setVista('explosion')}>Explosión de materiales</button>
+      </div>
+
+      {vista === 'explosion' ? <Explosion /> : <>
       {err && <div className="empty">No se pudo cargar la base: {err}</div>}
       {loading ? <div className="empty">Cargando...</div> : (
         <>
@@ -302,6 +310,7 @@ export default function App() {
           </div>
         </>
       )}
+      </>}
 
       {selected && (
         <Panel row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
