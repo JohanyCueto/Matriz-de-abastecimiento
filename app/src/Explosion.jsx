@@ -206,7 +206,11 @@ export default function Explosion() {
                         <td className="num">{f.variacionAbs > 0 ? '+' : ''}{fmt(f.variacionAbs)}</td>
                         <td className="num">{f.variacionPct == null ? '' : `${f.variacionPct > 0 ? '+' : ''}${f.variacionPct}%`}</td>
                         <td><span className={`tag ${CAT_TAG[f.categoria]}`}>{CAT_LABEL[f.categoria]}</span></td>
-                        <td className="num">{fmt(f.ocPendiente)}</td>
+                        <td className="num">
+                          {fmt(f.ocPendiente)}
+                          {f.ocEntregas.length === 1 && <div className="pct" style={{ margin: '2px 0 0' }}>OC {f.ocEntregas[0].oc}</div>}
+                          {f.ocEntregas.length > 1 && <div className="pct" style={{ margin: '2px 0 0' }}>{f.ocEntregas.length} OC, ver detalle</div>}
+                        </td>
                         <td className="num">{f.mermaPct}%</td>
                         <td className="num">{f.faltanteReal > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.faltanteReal)}</b> : <span className="dim">0</span>}</td>
                         <td className="num">{f.compraSugerida > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.compraSugerida)}</b> : <span className="dim">0</span>}</td>
@@ -234,6 +238,13 @@ export default function Explosion() {
                                 ))}
                               </tbody>
                             </table>
+                            {f.ocEntregas.length > 0 && (
+                              <div className="pct" style={{ marginTop: 8 }}>
+                                OC pendientes: {f.ocEntregas.map(e =>
+                                  `OC ${e.oc} — ${fmt(e.saldo)}${e.fecha ? ' — ' + fdate(e.fecha) : ''}`
+                                ).join(' · ')}
+                              </div>
+                            )}
                             {(f.version1 || f.version2 || f.version3) && (
                               <div className="pct" style={{ marginTop: 8 }}>
                                 Versiones: {[f.version1, f.version2, f.version3].filter(Boolean).join(', ')}

@@ -51,7 +51,7 @@ export function calcularCompraSugerida(filas, ocPorSku) {
     const mermaPct = mermaPorGrupo(f.grupo)
     const mesesCobertura = coberturaMesesPorGrupo(f.grupo)
     const necesidad = necesidadHastaCobertura(f.meses, mesesCobertura)
-    const oc = ocPorSku.get(f.codigo) || { saldoPendiente: 0, fechaProgramada: null }
+    const oc = ocPorSku.get(f.codigo) || { saldoPendiente: 0, fechaProgramada: null, entregas: [] }
     const stock = f.stock || 0
 
     const faltanteReal = Math.max(0, necesidad - stock - oc.saldoPendiente)
@@ -85,6 +85,7 @@ export function calcularCompraSugerida(filas, ocPorSku) {
       mesesCobertura,
       necesidadCobertura: necesidad,
       ocPendiente: oc.saldoPendiente,
+      ocEntregas: oc.entregas,
       fechaEntregaProgramada: oc.fechaProgramada,
       faltanteReal,
       compraSugerida,

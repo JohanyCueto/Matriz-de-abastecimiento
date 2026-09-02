@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 import { insertInBatches } from './importer'
+import { CERRADAS } from './derive'
 
 // El texto de los encabezados de mes trae el año y cambia cada ciclo (ej.
 // "AGO.2026" o "AGOSTO 2026"), pero las tres primeras letras alcanzan para
@@ -204,23 +205,32 @@ export async function obtenerMaterialesDeSnapshot(snapshotId) {
   return data
 }
 
-// Para cada codigo, suma el saldo pendiente de todas sus entregas en
-// programacion_oc (sin importar el estado de gestion -- una entrega
-// atrasada igual sigue siendo material que va a llegar) y guarda la fecha
-// programada mas proxima entre las que todavia tienen saldo.
+// Para cada codigo, suma el saldo pendiente de todas sus entregas
+// realmente abiertas en programacion_oc (Pendiente, En seguimiento,
+// Reprogramado o Atrasado -- una entrega atrasada igual sigue siendo
+// material que va a llegar) y guarda la fecha programada mas proxima entre
+// esas. Una entrega que Johany ya cerro a mano (estado "Cerrado"), aunque
+// le haya quedado saldo por tolerancia, no cuenta como pendiente: ya no va
+// a llegar mas -- es la misma regla que decide "abierto" en Seguimiento OC
+// (ver CERRADAS en lib/derive.js). Tambien se guarda el detalle de OC por
+// entrega, para poder mostrar en pantalla cual OC exactamente cubre el
+// consumo, no solo el total.
 export async function obtenerOcPorSku(codigos) {
   const m = new Map()
   if (!codigos.length) return m
   const { data, error } = await supabase
     .from('programacion_oc')
-    .select('sku,saldo_pendiente,fecha_programada_ingreso')
+    .select('oc,sku,saldo_pendiente,fecha_programada_ingreso,estado_gestion')
     .in('sku', codigos)
   if (error) throw error
   for (const row of data) {
-    if (!m.has(row.sku)) m.set(row.sku, { saldoPendiente: 0, fechaProgramada: null })
+    if (!m.has(row.sku)) m.set(row.sku, { saldoPendiente: 0, fechaProgramada: null, entregas: [] })
     const acc = m.get(row.sku)
-    acc.saldoPendiente += row.saldo_pendiente || 0
-    if ((row.saldo_pendiente || 0) > 0 && row.fecha_programada_ingreso) {
+    const saldo = row.saldo_pendiente || 0
+    if (saldo <= 0 || CERRADAS.includes(row.estado_gestion)) continue
+    acc.saldoPendiente += saldo
+    acc.entregas.push({ oc: row.oc, saldo, fecha: row.fecha_programada_ingreso })
+    if (row.fecha_programada_ingreso) {
       if (!acc.fechaProgramada || row.fecha_programada_ingreso < acc.fechaProgramada) {
         acc.fechaProgramada = row.fecha_programada_ingreso
       }
