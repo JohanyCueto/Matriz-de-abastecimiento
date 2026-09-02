@@ -60,6 +60,8 @@ select{cursor:pointer;min-width:150px}
 .impst.err{color:var(--red)}
 
 .tw{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.expl-sec{margin-bottom:18px}
+.expl-sec h3{font-size:13.5px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .scroll{overflow-x:auto;max-height:660px;overflow-y:auto}
 table{width:100%;border-collapse:collapse;font-size:12.8px}
 thead th{

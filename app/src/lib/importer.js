@@ -79,7 +79,7 @@ async function registrarImportacion(tipo, archivo, filas) {
   if (error) throw error
 }
 
-async function insertInBatches(table, rows, size = 500) {
+export async function insertInBatches(table, rows, size = 500) {
   for (let i = 0; i < rows.length; i += size) {
     const batch = rows.slice(i, i + size)
     if (!batch.length) continue
