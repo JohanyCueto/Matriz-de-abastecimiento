@@ -13,8 +13,7 @@ const CAT_GES = ['En seguimiento', 'Reprogramado', 'Atrasado', 'Cerrado']
 
 const COLS = [
   { k: 'sem2', l: '', w: '30px' },
-  { k: 'oc', l: 'OC/OI' },
-  { k: 'origen', l: 'Origen', w: '90px' },
+  { k: 'oc', l: 'OC' },
   { k: 'sku', l: 'SKU' },
   { k: 'entN', l: 'Entrega', w: '86px' },
   { k: 'descripcion', l: 'Material' },
@@ -138,7 +137,6 @@ export default function App() {
     switch (k) {
       case 'sem2': return <span className="dot" style={{ background: SEM[r.sem2].c }} />
       case 'oc': return <span className="mono">{r.oc}</span>
-      case 'origen': return <span className={`tag ${r.origen === 'Importado' ? 't-blu' : 't-gry'}`}>{r.origen || ''}</span>
       case 'sku': return <span className="mono">{r.sku}</span>
       case 'entN': return r.entTot > 1 ? <span className="tag t-blu">{r.entN} de {r.entTot}</span> : <span className="dim">unica</span>
       case 'descripcion': return <div className="dsc">{r.descripcion || ''}</div>
@@ -209,7 +207,7 @@ export default function App() {
           </div>
 
           <div className="bar">
-            <input type="text" placeholder="Buscar por OC/OI, SKU, descripcion o proveedor" value={q} onChange={e => setQ(e.target.value)} />
+            <input type="text" placeholder="Buscar por OC, SKU, descripcion o proveedor" value={q} onChange={e => setQ(e.target.value)} />
             <select value={fEst} onChange={e => setFEst(e.target.value)}>
               <option value="">Todos los estados</option>
               {CAT_EST.map(v => <option key={v} value={v}>{v}</option>)}

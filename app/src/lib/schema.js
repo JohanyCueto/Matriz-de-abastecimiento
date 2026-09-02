@@ -4,9 +4,7 @@
 
 export const PROGRAMACION_COLUMNS = [
   { header: 'Fecha emisión OC', field: 'fecha_emision_oc', type: 'date' },
-  { header: 'OC/OI', field: 'oc', type: 'int' },
-  { header: 'Origen', field: 'origen', type: 'text' },
-  { header: 'Tipo documento', field: 'tipo_documento', type: 'text' },
+  { header: 'OC', field: 'oc', type: 'int' },
   { header: 'Proveedor', field: 'proveedor', type: 'text' },
   { header: 'Comprador', field: 'comprador', type: 'text' },
   { header: 'Moneda', field: 'moneda', type: 'text' },
@@ -66,9 +64,7 @@ const VERDE_OSCURO = '275417'
 // Johany, mezclando las que vienen del Excel con las que calcula la app.
 export const EXPORT_COLUMNS = [
   { header: 'Fecha emisión OC', field: 'fecha_emision_oc', type: 'date', color: VERDE },
-  { header: 'OC/OI', field: 'oc', color: VERDE },
-  { header: 'Origen', field: 'origen', color: VERDE },
-  { header: 'Tipo documento', field: 'tipo_documento', color: VERDE },
+  { header: 'OC', field: 'oc', color: VERDE },
   { header: 'Proveedor', field: 'proveedor', color: VERDE },
   { header: 'Comprador', field: 'comprador', color: VERDE },
   { header: 'Moneda', field: 'moneda', color: VERDE },
