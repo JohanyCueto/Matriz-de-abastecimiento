@@ -2,11 +2,13 @@
 :root{
   --bg:#f7f7f8; --card:#ffffff; --line:#e9e9ec; --line2:#f1f1f3;
   --ink:#17171a; --ink2:#5c5c66; --ink3:#9a9aa4;
-  --acc:#2f3d54;
+  /* Colores de marca Roxfarma (de Plantilla_Roxfarma_2026.pptx): azul marino
+     principal y azul de acento, usados en el encabezado de cada diapositiva. */
+  --acc:#00167b; --acc2:#0060ae; --accbg:#eaf1fb;
   --red:#c8443c; --redbg:#fdf0ef;
   --amb:#b57724; --ambbg:#fdf6ea;
   --grn:#3f7d54; --grnbg:#eff6f1;
-  --blu:#3a5f8f; --blubg:#eef3f9;
+  --blu:#0060ae; --blubg:#eaf1fb;
   --gry:#8a8a94; --grybg:#f3f3f5;
 }
 body{
@@ -34,8 +36,14 @@ h1{font-size:20px;font-weight:600;letter-spacing:-.3px}
 .login-err{background:var(--redbg);color:var(--red);font-size:12.5px;padding:9px 11px;border-radius:8px;margin-bottom:14px}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:20px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px;cursor:pointer;transition:.14s;position:relative;overflow:hidden}
-.kpi:hover{border-color:#d3d3d9;transform:translateY(-1px)}
+.kpi{
+  background:var(--card);border:1px solid #dde1ea;border-radius:12px;padding:16px 17px 15px;
+  cursor:pointer;transition:.14s;position:relative;overflow:hidden;
+  box-shadow:0 1px 2px rgba(0,22,123,.05);
+}
+.kpi:before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc)}
+.kpi.r:before{background:var(--red)} .kpi.a:before{background:var(--amb)} .kpi.g:before{background:var(--grn)}
+.kpi:hover{border-color:#c5cbdb;box-shadow:0 3px 10px rgba(0,22,123,.08);transform:translateY(-1px)}
 .kpi.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 .kpi .lb{font-size:11.5px;color:var(--ink3);letter-spacing:.2px}
 .kpi .vl{font-size:26px;font-weight:600;letter-spacing:-.8px;margin-top:5px;line-height:1.1}
