@@ -33,7 +33,11 @@ create table if not exists explosion_materiales (
   -- sola si se puede combinar stock entre versiones, eso lo revisa Johany.
   version1 text,
   version2 text,
-  version3 text
+  version3 text,
+  -- Resumen calculado desde EXPLOSION_DETALLADA al importar (no se
+  -- guardan las filas crudas del detalle, serian ~11,200 por snapshot).
+  mes_fabricacion_proximo date,
+  fecha_requerida_ingreso date
 );
 
 create index if not exists idx_explosion_materiales_snapshot on explosion_materiales (snapshot_id);

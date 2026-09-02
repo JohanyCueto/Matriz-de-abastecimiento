@@ -38,12 +38,29 @@ const COL = {
 }
 const MESES_COUNT = 5
 
+// Posiciones en la hoja "explosion_detallada." (ojo el punto final en el
+// nombre). Solo se usan para calcular el mes de fabricacion mas proximo
+// por material -- no se guardan las ~11,200 filas crudas.
+const DETALLE_COL = { codigo: 0, fechaFabricacion: 10 }
+
 const toNum = v => (v == null || v === '') ? null : Number(v)
 const cleanText = v => {
   if (v == null) return null
   const s = String(v).trim()
   return s === '' ? null : s
 }
+
+function toDateOnly(v) {
+  if (v == null || v === '') return null
+  const d = v instanceof Date ? v : new Date(v)
+  return isNaN(d) ? null : d
+}
+const fechaStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const primerDiaMes = d => new Date(d.getFullYear(), d.getMonth(), 1)
+// Regla de anticipacion: el material debe ingresar ~el dia 10 del mes
+// anterior al de fabricacion (fabricacion octubre -> requerido ~10 de
+// setiembre).
+const fechaRequeridaDesdeFabricacion = mesFabricacion => new Date(mesFabricacion.getFullYear(), mesFabricacion.getMonth() - 1, 10)
 
 // Lee la hoja "explosion" del archivo que Johany sube periodicamente,
 // guarda un snapshot nuevo con solo los materiales ME (uno por mes), para
@@ -67,12 +84,32 @@ export async function importarExplosion(file, onStep) {
     mesFechas.push(fecha)
   }
 
+  onStep?.('Buscando el mes de fabricación...')
+  // El mes de fabricacion mas proximo sale de "explosion_detallada.", no
+  // de la hoja principal. Se calcula el resumen (minimo por codigo) aqui
+  // y no se guardan las filas crudas del detalle.
+  const fabricacionPorCodigo = new Map()
+  const shDet = wb.Sheets['explosion_detallada.']
+  if (shDet) {
+    const detRows = XLSX.utils.sheet_to_json(shDet, { header: 1, defval: null })
+    for (const row of detRows.slice(1)) {
+      if (!row) continue
+      const codigo = cleanText(row[DETALLE_COL.codigo])
+      const fecha = toDateOnly(row[DETALLE_COL.fechaFabricacion])
+      if (!codigo || !fecha) continue
+      const actual = fabricacionPorCodigo.get(codigo)
+      if (!actual || fecha < actual) fabricacionPorCodigo.set(codigo, fecha)
+    }
+  }
+
   onStep?.('Preparando los materiales...')
   const materiales = []
   for (const row of dataRows) {
     if (!row || row[COL.tipo] !== 'ME') continue
     const codigo = cleanText(row[COL.codigo])
     if (!codigo) continue
+    const fechaFabricacion = fabricacionPorCodigo.get(codigo)
+    const mesFabricacionProximo = fechaFabricacion ? primerDiaMes(fechaFabricacion) : null
     const base = {
       codigo,
       descripcion: cleanText(row[COL.descripcion]),
@@ -84,6 +121,8 @@ export async function importarExplosion(file, onStep) {
       version1: cleanText(row[COL.version1]),
       version2: cleanText(row[COL.version2]),
       version3: cleanText(row[COL.version3]),
+      mes_fabricacion_proximo: mesFabricacionProximo ? fechaStr(mesFabricacionProximo) : null,
+      fecha_requerida_ingreso: mesFabricacionProximo ? fechaStr(fechaRequeridaDesdeFabricacion(mesFabricacionProximo)) : null,
     }
     for (let i = 0; i < MESES_COUNT; i++) {
       materiales.push({
@@ -131,4 +170,29 @@ export async function obtenerMaterialesDeSnapshot(snapshotId) {
     .eq('snapshot_id', snapshotId)
   if (error) throw error
   return data
+}
+
+// Para cada codigo, suma el saldo pendiente de todas sus entregas en
+// programacion_oc (sin importar el estado de gestion -- una entrega
+// atrasada igual sigue siendo material que va a llegar) y guarda la fecha
+// programada mas proxima entre las que todavia tienen saldo.
+export async function obtenerOcPorSku(codigos) {
+  const m = new Map()
+  if (!codigos.length) return m
+  const { data, error } = await supabase
+    .from('programacion_oc')
+    .select('sku,saldo_pendiente,fecha_programada_ingreso')
+    .in('sku', codigos)
+  if (error) throw error
+  for (const row of data) {
+    if (!m.has(row.sku)) m.set(row.sku, { saldoPendiente: 0, fechaProgramada: null })
+    const acc = m.get(row.sku)
+    acc.saldoPendiente += row.saldo_pendiente || 0
+    if ((row.saldo_pendiente || 0) > 0 && row.fecha_programada_ingreso) {
+      if (!acc.fechaProgramada || row.fecha_programada_ingreso < acc.fechaProgramada) {
+        acc.fechaProgramada = row.fecha_programada_ingreso
+      }
+    }
+  }
+  return m
 }
