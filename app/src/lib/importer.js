@@ -189,6 +189,10 @@ export async function importarExcel(file, onStep) {
   onStep?.('Preparando las entregas...')
   const entregas = rawProg.map(raw => {
     const base = mapRow(raw, PROGRAMACION_COLUMNS)
+    // "Origen" no viene del Excel: se calcula solo a partir de "Tipo
+    // documento" ('OC' -> 'Local', 'OI' -> 'Importado'), asi Johany no
+    // tiene que agregar ni mantener ninguna columna nueva en su archivo.
+    base.origen = base.tipo_documento === 'OI' ? 'Importado' : base.tipo_documento === 'OC' ? 'Local' : null
     // No confiamos en que la columna "ID entrega" del Excel siempre venga
     // llena (a veces esta vacia): la armamos nosotros mismos con OC, SKU
     // y N. entrega, que es exactamente como esta armada cuando si viene.

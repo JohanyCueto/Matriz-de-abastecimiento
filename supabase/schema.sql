@@ -3,6 +3,8 @@ create table if not exists programacion_oc (
   id_entrega text primary key,
   fecha_emision_oc date,
   oc bigint not null,
+  tipo_documento text, -- 'OC' u 'OI', tal cual viene de esa columna en el Excel
+  origen text, -- 'Local' u 'Importado', calculado por el importador desde tipo_documento
   proveedor text,
   comprador text,
   moneda text,

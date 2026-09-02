@@ -5,6 +5,11 @@
 export const PROGRAMACION_COLUMNS = [
   { header: 'Fecha emisión OC', field: 'fecha_emision_oc', type: 'date' },
   { header: 'OC', field: 'oc', type: 'int' },
+  // 'Tipo documento' ya existe en el Excel de Johany ('OC' u 'OI'). 'origen'
+  // no se lee del Excel: el importador la calcula sola a partir de esta
+  // columna ('OC' -> 'Local', 'OI' -> 'Importado'), para no tener que
+  // agregar ni tocar ninguna columna en el archivo de Johany.
+  { header: 'Tipo documento', field: 'tipo_documento', type: 'text' },
   { header: 'Proveedor', field: 'proveedor', type: 'text' },
   { header: 'Comprador', field: 'comprador', type: 'text' },
   { header: 'Moneda', field: 'moneda', type: 'text' },
@@ -65,6 +70,8 @@ const VERDE_OSCURO = '275417'
 export const EXPORT_COLUMNS = [
   { header: 'Fecha emisión OC', field: 'fecha_emision_oc', type: 'date', color: VERDE },
   { header: 'OC', field: 'oc', color: VERDE },
+  { header: 'Tipo documento', field: 'tipo_documento', color: VERDE },
+  { header: 'Origen', field: 'origen', color: VERDE },
   { header: 'Proveedor', field: 'proveedor', color: VERDE },
   { header: 'Comprador', field: 'comprador', color: VERDE },
   { header: 'Moneda', field: 'moneda', color: VERDE },
