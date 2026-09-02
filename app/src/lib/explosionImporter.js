@@ -43,6 +43,17 @@ const MESES_COUNT = 5
 // por material -- no se guardan las ~11,200 filas crudas.
 const DETALLE_COL = { codigo: 0, fechaFabricacion: 10 }
 
+// El nombre del archivo trae la fecha de corte real (ej.
+// "Explosion_Analisis__2026.08.27.xlsx"). Se usa para ordenar "anterior
+// vs. actual" en vez de la fecha en que se subio -- asi, si algun dia hay
+// que volver a subir un archivo viejo (ej. para corregir una carga que
+// fallo a la mitad), el orden no se invierte solo porque se subio despues.
+function fechaCorteDesdeNombre(nombreArchivo) {
+  const m = String(nombreArchivo || '').match(/(\d{4})\.(\d{2})\.(\d{2})/)
+  if (!m) return null
+  return `${m[1]}-${m[2]}-${m[3]}`
+}
+
 const toNum = v => (v == null || v === '') ? null : Number(v)
 const cleanText = v => {
   if (v == null) return null
@@ -137,7 +148,7 @@ export async function importarExplosion(file, onStep) {
   onStep?.('Guardando el snapshot...')
   const { data: snap, error: errSnap } = await supabase
     .from('explosion_snapshots')
-    .insert({ archivo: file.name })
+    .insert({ archivo: file.name, fecha_corte: fechaCorteDesdeNombre(file.name) })
     .select('id')
     .single()
   if (errSnap) throw errSnap
@@ -145,6 +156,18 @@ export async function importarExplosion(file, onStep) {
   const conSnapshot = materiales.map(m => ({ ...m, snapshot_id: snap.id }))
   onStep?.('Guardando los materiales...')
   await insertInBatches('explosion_materiales', conSnapshot)
+
+  // Verificacion de integridad: si algun lote fallo a la mitad sin lanzar
+  // error (ej. se corto la conexion), es mejor avisar claro que dejar un
+  // snapshot incompleto que despues se compara como si estuviera bien.
+  const { count, error: errCount } = await supabase
+    .from('explosion_materiales')
+    .select('id', { count: 'exact', head: true })
+    .eq('snapshot_id', snap.id)
+  if (errCount) throw errCount
+  if (count !== conSnapshot.length) {
+    throw new Error(`Se guardaron ${count} de ${conSnapshot.length} filas esperadas. El snapshot quedó incompleto -- borra este snapshot (archivo "${file.name}") en Supabase y vuelve a intentar.`)
+  }
 
   return {
     materiales: new Set(materiales.map(m => m.codigo)).size,
@@ -154,13 +177,22 @@ export async function importarExplosion(file, onStep) {
 }
 
 export async function obtenerUltimosSnapshots(n = 2) {
+  // Se trae un colchón de snapshots recientes (por fecha de carga) y se
+  // reordena por fecha_corte (la fecha real del archivo) del lado del
+  // cliente, para que "anterior vs. actual" siga la fecha del archivo y
+  // no el orden en que se subieron.
   const { data, error } = await supabase
     .from('explosion_snapshots')
-    .select('id,archivo,creado_en')
+    .select('id,archivo,creado_en,fecha_corte')
     .order('creado_en', { ascending: false })
-    .limit(n)
+    .limit(Math.max(n, 10))
   if (error) throw error
-  return data
+  const ordenados = [...data].sort((a, b) => {
+    const fa = a.fecha_corte || a.creado_en
+    const fb = b.fecha_corte || b.creado_en
+    return fb.localeCompare(fa)
+  })
+  return ordenados.slice(0, n)
 }
 
 export async function obtenerMaterialesDeSnapshot(snapshotId) {
