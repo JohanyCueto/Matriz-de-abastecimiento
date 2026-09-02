@@ -17,7 +17,10 @@ export function useSesion() {
     if (!sesion) { setPerfil(null); return }
     supabase.from('perfiles').select('nombre,rol').eq('id', sesion.user.id).single()
       .then(({ data }) => setPerfil(data))
-  }, [sesion])
+    // Se compara el id de usuario, no el objeto sesion completo: Supabase
+    // genera una sesion "nueva" cada vez que renueva el token al volver a
+    // la pestaña, y no hace falta pedir el perfil de nuevo por eso.
+  }, [sesion?.user?.id])
 
   return { sesion, perfil, cargando: sesion === undefined }
 }

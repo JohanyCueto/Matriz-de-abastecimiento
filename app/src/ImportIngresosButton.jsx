@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { importarExcel } from './lib/importer'
+import { importarIngresos } from './lib/importer'
 
-export default function ImportButton({ onDone }) {
+export default function ImportIngresosButton({ onDone }) {
   const inputRef = useRef(null)
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -13,8 +13,8 @@ export default function ImportButton({ onDone }) {
     setBusy(true)
     setStatus('Empezando...')
     try {
-      const r = await importarExcel(file, setStatus)
-      setStatus(`✓ ${file.name} subido con exito — ${r.entregas} entregas, ${r.ingresosNuevos} ingresos nuevos`)
+      const r = await importarIngresos(file, setStatus)
+      setStatus(`✓ ${file.name} subido con exito — ${r.ingresosNuevos} ingresos nuevos, ${r.entregasActualizadas} entregas revisadas`)
       onDone()
     } catch (err) {
       setStatus('Error: ' + err.message)
@@ -26,7 +26,7 @@ export default function ImportButton({ onDone }) {
   return (
     <div className="imp">
       <button className="btn" disabled={busy} onClick={() => inputRef.current.click()}>
-        {busy ? 'Importando...' : 'Importar Excel'}
+        {busy ? 'Importando...' : 'Importar Ingresos'}
       </button>
       <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
       {status && <span className={`impst ${status.startsWith('Error') ? 'err' : ''}`}>{status}</span>}

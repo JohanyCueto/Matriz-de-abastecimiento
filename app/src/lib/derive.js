@@ -19,14 +19,22 @@ export const days = s => s ? Math.round((new Date(s + 'T00:00:00') - new Date())
 
 export const CERRADAS = ['Cerrado']
 
+// Margen aceptado al cerrar una entrega con falta o demasia frente a lo
+// programado. Dentro de este margen se acepta como cierre normal; mas alla,
+// sigue necesitando que Johany lo cierre a mano, pero se marca aparte para
+// que salte a la vista que puede afectar el abastecimiento.
+export const TOLERANCIA_MARGEN = 0.08
+
 export const SEM = {
   atrasado: { c: 'var(--red)', t: 't-red', l: 'Atrasado' },
+  desviado: { c: 'var(--red)', t: 't-red', l: 'Cerrada fuera de tolerancia' },
   porllegar: { c: 'var(--amb)', t: 't-amb', l: 'Por llegar' },
   enfecha: { c: 'var(--blu)', t: 't-blu', l: 'En fecha' },
+  sinfecha: { c: 'var(--amb)', t: 't-amb', l: 'Sin fecha programada' },
   tolerancia: { c: 'var(--grn)', t: 't-grn', l: 'Cerrada dentro de tolerancia' },
   cerrado: { c: 'var(--gry)', t: 't-gry', l: 'Cerrado' },
 }
-export const EST_TAG = { Completo: 't-grn', Parcial: 't-amb', Pendiente: 't-blu' }
+export const EST_TAG = { Completo: 't-grn', Pendiente: 't-blu' }
 export const GES_TAG = { 'En seguimiento': 't-blu', Reprogramado: 't-amb', Atrasado: 't-red', Cerrado: 't-gry' }
 
 export const MOTIVOS = ['', 'Falta de stock proveedor', 'Demora producción proveedor', 'Demora logística / despacho', 'Ingreso parcial', 'Reprogramación interna']
@@ -55,19 +63,41 @@ export function withEntregas(rows) {
 export function enrich(r) {
   const saldo = r.saldo_pendiente || 0
   const abierto = saldo > 0 && !CERRADAS.includes(r.estado_gestion)
+  // "Cerrada con saldo" (tol, en el sentido amplio) pasa siempre por una
+  // decision manual de Johany. Dentro del margen de tolerancia se acepta
+  // como cierre normal (verde); mas alla del margen sigue siendo un cierre
+  // manual suyo, pero se distingue para que revise si le afecta el
+  // abastecimiento (rojo, "fuera de tolerancia").
   const tol = CERRADAS.includes(r.estado_gestion) && saldo > 0
   const dd = days(r.fecha_programada_ingreso)
   const prog = r.cant_programada || 0
   const avance = prog ? Math.min(1, (r.cant_ingresada || 0) / prog) : 0
   const desv = prog ? ((r.cant_ingresada || 0) - prog) / prog : 0
+  const dentroTolerancia = tol && Math.abs(desv) <= TOLERANCIA_MARGEN
+  const fueraTolerancia = tol && Math.abs(desv) > TOLERANCIA_MARGEN
   let sem2
-  if (tol) sem2 = 'tolerancia'
+  if (dentroTolerancia) sem2 = 'tolerancia'
+  else if (fueraTolerancia) sem2 = 'desviado'
   else if (!abierto) sem2 = 'cerrado'
-  else if (dd == null) sem2 = 'enfecha'
+  else if (dd == null) sem2 = 'sinfecha'
   else if (dd < 0) sem2 = 'atrasado'
   else if (dd <= 7) sem2 = 'porllegar'
   else sem2 = 'enfecha'
   const hist = Array.isArray(r.historial) ? r.historial : []
   const fprog0 = hist.length ? hist[0].de : r.fecha_programada_ingreso
-  return { ...r, abierto, tol, dd, avance, desv, sem2, hist, fprog0 }
+  // La Gestion se recalcula sola, igual que los Dias: si ya no queda nada
+  // pendiente (o alguien la cerro a mano), se ve Cerrado; si se paso la
+  // fecha y sigue con saldo, Atrasado; si no, se respeta lo que haya
+  // dejado la gente (Reprogramado, etc.) o "En seguimiento" por defecto.
+  const estadoGestion = !abierto ? 'Cerrado'
+    : (dd != null && dd < 0) ? 'Atrasado'
+    : (r.estado_gestion || 'En seguimiento')
+  // Igual que Gestion: si el dato guardado quedo viejo (por ejemplo un
+  // "Parcial" de antes de fusionar ese estado con Pendiente), no se
+  // confia en el valor de la base, se calcula solo. "Pendiente" quiere
+  // decir que la linea sigue abierta y necesita seguimiento: si ya la
+  // cerraste (aunque sea con tolerancia y le falte un poco), ya no cuenta
+  // como pendiente.
+  const estadoIngreso = abierto ? 'Pendiente' : 'Completo'
+  return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
 }

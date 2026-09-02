@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { useSesion } from './lib/auth'
 import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
+import { ultimasImportaciones, hace } from './lib/importaciones'
 import Panel from './Panel'
+import Recordatorio from './Recordatorio'
 import ImportButton from './ImportButton'
+import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
+import ExportAlmacenButton from './ExportAlmacenButton'
 import Login from './Login'
 import './App.css'
 
-const CAT_EST = ['Pendiente', 'Parcial', 'Completo']
+const CAT_EST = ['Pendiente', 'Completo']
 const CAT_GES = ['En seguimiento', 'Reprogramado', 'Atrasado', 'Cerrado']
 
 const COLS = [
@@ -36,7 +40,9 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
+  const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
 
+  const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
   const [fEst, setFEst] = useState('')
   const [fGes, setFGes] = useState('')
@@ -47,6 +53,7 @@ export default function App() {
   const [soloTol, setSoloTol] = useState(false)
   const [sortK, setSortK] = useState('sem2')
   const [sortD, setSortD] = useState(1)
+  const [importaciones, setImportaciones] = useState({})
 
   async function cargar() {
     setLoading(true)
@@ -55,9 +62,22 @@ export default function App() {
     if (error) { setErr(error.message); setLoading(false); return }
     setRows(withEntregas(data.map(enrich)))
     setLoading(false)
+    ultimasImportaciones().then(setImportaciones).catch(() => {})
   }
 
-  useEffect(() => { if (sesion) cargar() }, [sesion])
+  // Ojo: Supabase renueva el token de sesion cada vez que vuelves a la
+  // pestaña, generando una sesion "nueva" aunque sigas siendo la misma
+  // persona. Por eso se compara el id de usuario, no el objeto sesion
+  // completo, para no recargar todo y que la pantalla no parpadee.
+  useEffect(() => { if (sesion) cargar() }, [sesion?.user?.id])
+
+  // Con ~500 filas, filtrar y redibujar la tabla en cada tecla se siente
+  // trabado. Se espera un momento sin escribir antes de aplicar la
+  // busqueda, para que el cuadro de texto responda al instante.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 250)
+    return () => clearTimeout(t)
+  }, [qInput])
 
   function actualizarFila(id, patch) {
     setRows(prev => withEntregas(prev.map(r => r.id_entrega === id ? enrich({ ...r, ...patch }) : r).map(r => ({ ...r }))))
@@ -74,18 +94,22 @@ export default function App() {
     const ab = rows.filter(r => r.abierto)
     const at = ab.filter(r => r.sem2 === 'atrasado')
     const pl = ab.filter(r => r.sem2 === 'porllegar')
+    const sf = ab.filter(r => r.sem2 === 'sinfecha')
     const vs = ab.filter(r => r.moneda === 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const vd = ab.filter(r => r.moneda !== 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const rp = rows.filter(r => r.hist.length).length
-    const tl = rows.filter(r => r.tol).length
-    const cc = rows.length - ab.length - tl
+    const tl = rows.filter(r => r.dentroTolerancia).length
+    const fd = rows.filter(r => r.fueraTolerancia).length
+    const cc = rows.length - ab.length - tl - fd
     return [
       { id: '', lb: 'Lineas totales', vl: rows.length, ft: 'entregas programadas', cl: '' },
       { id: 'abierto', lb: 'Abiertas', vl: ab.length, ft: 'con saldo pendiente', cl: '' },
       { id: 'atrasado', lb: 'Atrasadas', vl: at.length, ft: 'pasaron su fecha', cl: 'r' },
+      { id: 'sinfecha', lb: 'Sin fecha programada', vl: sf.length, ft: 'necesitan fecha', cl: 'a' },
       { id: 'porllegar', lb: 'Llegan en 7 dias', vl: pl.length, ft: 'ventana inmediata', cl: 'a' },
       { id: 'repro', lb: 'Reprogramadas', vl: rp, ft: 'con fecha movida', cl: 'a' },
-      { id: 'cerrado', lb: 'Cerradas', vl: cc + tl, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia`, cl: 'g' },
+      { id: 'desviado', lb: 'Cerradas fuera de tolerancia', vl: fd, ft: 'revisar si afecta el abastecimiento', cl: fd > 0 ? 'r' : '' },
+      { id: 'cerrado', lb: 'Cerradas', vl: cc + tl + fd, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia, ${fmt(fd)} fuera de tolerancia`, cl: 'g' },
       { id: 'valor', lb: 'Valor pendiente', vl: `S/ ${fmt(vs)}`, ft: `mas US$ ${fmt(vd)}`, cl: '' },
     ]
   }, [rows])
@@ -105,12 +129,14 @@ export default function App() {
       if (quick === 'abierto' && !r.abierto) return false
       if (quick === 'cerrado' && r.abierto) return false
       if (quick === 'atrasado' && r.sem2 !== 'atrasado') return false
+      if (quick === 'sinfecha' && r.sem2 !== 'sinfecha') return false
       if (quick === 'porllegar' && r.sem2 !== 'porllegar') return false
       if (quick === 'repro' && !r.hist.length) return false
+      if (quick === 'desviado' && r.sem2 !== 'desviado') return false
       if (soloTol && !r.tol) return false
       return true
     })
-    const ord = { atrasado: 0, porllegar: 1, enfecha: 2, tolerancia: 3, cerrado: 4 }
+    const ord = { atrasado: 0, desviado: 1, sinfecha: 2, porllegar: 3, enfecha: 4, tolerancia: 5, cerrado: 6 }
     out.sort((a, b) => {
       if (sortK === 'sem2') return (ord[a.sem2] - ord[b.sem2]) * sortD
       let x = a[sortK], y = b[sortK]
@@ -129,7 +155,7 @@ export default function App() {
   }
 
   function limpiar() {
-    setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes('')
+    setQInput(''); setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes('')
     setQuick(''); setSoloTol(false)
   }
 
@@ -151,19 +177,22 @@ export default function App() {
         {r.hist.length > 0 && <span className="rep" title={`Reprogramada ${r.hist.length} ${r.hist.length === 1 ? 'vez' : 'veces'}. Fecha original ${fdate(r.fprog0)}`}>R{r.hist.length > 1 ? r.hist.length : ''}</span>}
       </>
       case 'dd':
-        if (r.tol) return <span className="dim">tolerancia</span>
+        if (r.dentroTolerancia) return <span className="dim">tolerancia</span>
+        if (r.fueraTolerancia) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>fuera de tolerancia</span>
         if (!r.abierto) return <span className="dim">{r.dias_atraso ? '+' + fmt(r.dias_atraso) : '0'}</span>
+        if (r.dd == null) return <span style={{ color: 'var(--amb)', fontWeight: 500 }}>sin fecha</span>
         if (r.dd < 0) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>{-r.dd} atraso</span>
         return <span className="dim">faltan {r.dd}</span>
       case 'desv': {
         if (!r.tol) return <span className="dim">-</span>
         const pc = r.desv * 100
-        return <span className="tag t-grn" title={`Cerrada con ${pc > 0 ? 'exceso' : 'faltante'} de ${Math.abs(pc).toFixed(1)}% frente a lo programado`}>{pc > 0 ? '+' : ''}{pc.toFixed(1)}%</span>
+        return <span className={`tag ${r.dentroTolerancia ? 't-grn' : 't-red'}`} title={`Cerrada con ${pc > 0 ? 'exceso' : 'faltante'} de ${Math.abs(pc).toFixed(1)}% frente a lo programado${r.fueraTolerancia ? ' (supera el margen de 8%)' : ''}`}>{pc > 0 ? '+' : ''}{pc.toFixed(1)}%</span>
       }
       case 'estado_ingreso': return <span className={`tag ${EST_TAG[r.estado_ingreso] || 't-gry'}`}>{r.estado_ingreso}</span>
       case 'estado_gestion': return <>
         <span className={`tag ${GES_TAG[r.estado_gestion] || 't-gry'}`}>{r.estado_gestion || ''}</span>
-        {r.tol && <span className="rep tolm" title="Cierre dentro de tolerancia">T</span>}
+        {r.dentroTolerancia && <span className="rep tolm" title="Cierre dentro de tolerancia">T</span>}
+        {r.fueraTolerancia && <span className="rep tolm" style={{ background: 'var(--red)' }} title="Cierre fuera de tolerancia: revisar abastecimiento">!</span>}
       </>
       default: return null
     }
@@ -181,6 +210,14 @@ export default function App() {
         <div>
           <h1>Seguimiento de materiales de empaque</h1>
           <div className="sub">Ordenes de compra programadas y su estado real de ingreso a almacen</div>
+          <div className="ultimasImp">
+            {importaciones.programacion && (
+              <span>Ultimo Excel: <b>{importaciones.programacion.archivo}</b> ({hace(importaciones.programacion.creado_en)})</span>
+            )}
+            {importaciones.ingresos && (
+              <span>Ultimos ingresos: <b>{importaciones.ingresos.archivo}</b> ({hace(importaciones.ingresos.creado_en)})</span>
+            )}
+          </div>
         </div>
         <div className="corte">
           <div className="usr">
@@ -207,7 +244,7 @@ export default function App() {
           </div>
 
           <div className="bar">
-            <input type="text" placeholder="Buscar por OC, SKU, descripcion o proveedor" value={q} onChange={e => setQ(e.target.value)} />
+            <input type="text" placeholder="Buscar por OC, SKU, descripcion o proveedor" value={qInput} onChange={e => setQInput(e.target.value)} />
             <select value={fEst} onChange={e => setFEst(e.target.value)}>
               <option value="">Todos los estados</option>
               {CAT_EST.map(v => <option key={v} value={v}>{v}</option>)}
@@ -231,7 +268,10 @@ export default function App() {
             <button className={`btn ${soloTol ? 'act' : ''}`} onClick={() => setSoloTol(v => !v)}>Solo tolerancia</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>
             {esEditor && <ImportButton onDone={cargar} />}
+            {esEditor && <ImportIngresosButton onDone={cargar} />}
             <ExportButton />
+            <ExportAlmacenButton />
+            <button className="btn" onClick={() => setMostrarRecordatorio(true)}>Recordatorio proveedor</button>
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
 
@@ -263,6 +303,10 @@ export default function App() {
 
       {selected && (
         <Panel row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
+      )}
+
+      {mostrarRecordatorio && (
+        <Recordatorio rows={rows} proveedores={proveedores} onClose={() => setMostrarRecordatorio(false)} />
       )}
     </div>
   )

@@ -27,22 +27,35 @@ Los datos "de verdad" viven en Supabase, no en el Excel. El Excel de Johany
 Excel** de la app (`app/src/lib/importer.js`), y:
 
 - `programacion_oc` se actualiza por `upsert`, usando la columna **ID
-  entrega** como llave. Los campos de gestión (`estado_gestion`,
-  `motivo_demora`, `responsable_accion`, `criticidad`, `observaciones`,
-  `cierre_manual`, `motivo_cierre`) **no se pisan** en filas que ya
-  existían: esos los maneja la gente desde la app, no el Excel.
-- `fecha_programada_ingreso` también queda protegida una vez que la fila ya
-  existe: solo cambia si alguien reprograma desde la app (que además deja
-  historial). Si no fuera así, resubir un Excel viejo podría borrar una
-  reprogramación ya hecha por el equipo.
+  entrega** como llave. El importador nunca confía en la columna "ID
+  entrega" ni en "Orden entrega" del Excel (a veces vienen vacías): las
+  calcula siempre él mismo a partir de OC + SKU + N° entrega.
+- Los campos de gestión (`motivo_demora`, `responsable_accion`,
+  `criticidad`, `observaciones`, `cierre_manual`, `motivo_cierre`) **no se
+  pisan** en filas que ya existían: esos los maneja la gente desde la app,
+  no el Excel.
+- `estado_gestion` es 100% manejado desde la app (panel de cada entrega):
+  nunca se toma del Excel, ni siquiera la primera vez que se crea una fila.
+  Si nadie lo tocó desde la app queda vacío, y la propia app calcula un
+  estado razonable al vuelo (Cerrado si ya no queda saldo, Atrasado si se
+  pasó la fecha, o "En seguimiento" por defecto). Así un "Cerrado" viejo o
+  mal puesto en el Excel original no se queda pegado para siempre en una
+  entrega que en realidad sigue pendiente. Si una fila queda mal cerrada de
+  antes de este cambio, se destraba con el botón **Reabrir línea para
+  editar** del panel (o con una limpieza puntual por SQL).
+- `fecha_programada_ingreso` también queda protegida, pero solo si de
+  verdad se reprogramó desde la app (eso se nota porque la fila ya tiene
+  `historial`). Si nunca se tocó desde ahí, se deja pasar la fecha que
+  traiga el Excel, para que las correcciones que Johany haga en su archivo
+  sí lleguen.
 - `ingresos_sistema` solo agrega filas nuevas (dedup por `numero_analisis`),
   nunca se borran ni se pisan las anteriores.
 - Cada importación recalcula `cant_ingresada`, `saldo_pendiente`,
   `pct_ingreso`, `estado_ingreso`, `fecha_real_ingreso` y `dias_atraso` en
   `programacion_oc`, cruzando por OC + SKU contra todos los eventos de
   `ingresos_sistema` acumulados hasta la fecha. El reparto es en orden: la
-  entrega más antigua (según `orden_entrega`, ej. E01) se llena primero,
-  porque así entregan los proveedores.
+  entrega más antigua (según `orden_entrega`, calculado del N° entrega, ej.
+  E01 antes que E02) se llena primero, porque así entregan los proveedores.
 - `dias_atraso` nunca es negativo: si llega antes de lo programado, queda en
   0 (así lo calcula también el Excel original de Johany).
 - El Excel de Johany a veces trae la misma entrega duplicada (mismo OC +
