@@ -27,7 +27,13 @@ create table if not exists explosion_materiales (
   cuarentena numeric,
   mes date not null,
   consumo_proyectado numeric,
-  consumo_firme numeric
+  consumo_firme numeric,
+  -- Version(es) del material impreso (columnas AQ/AR/AS de "explosion").
+  -- Se guardan tal cual vienen, solo para mostrarlas -- la app no decide
+  -- sola si se puede combinar stock entre versiones, eso lo revisa Johany.
+  version1 text,
+  version2 text,
+  version3 text
 );
 
 create index if not exists idx_explosion_materiales_snapshot on explosion_materiales (snapshot_id);

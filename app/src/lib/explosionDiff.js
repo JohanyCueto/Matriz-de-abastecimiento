@@ -1,14 +1,23 @@
 // Compara dos snapshots de la explosion de materiales (filas de
-// explosion_materiales) y devuelve que cambio entre el anterior y el
-// actual: materiales nuevos, que ya no aparecen, y cuyo consumo en firme
-// subio o bajo -- con el detalle mes a mes, para que se vea exactamente
-// donde esta la diferencia.
+// explosion_materiales) y arma UNA tabla con todos los materiales (union
+// de codigos de ambos snapshots), cada uno con su variacion de consumo en
+// firme y el detalle mes a mes -- para que Johany vea de un vistazo que
+// cambio, no solo lo que subio o bajo.
+
+function contarClientes(cliente) {
+  if (!cliente) return 0
+  return new Set(cliente.split(',').map(s => s.trim()).filter(Boolean)).size
+}
 
 function agruparPorCodigo(filas) {
   const m = new Map()
   for (const f of filas) {
     if (!m.has(f.codigo)) {
-      m.set(f.codigo, { codigo: f.codigo, descripcion: f.descripcion, cliente: f.cliente, grupo: f.grupo, meses: new Map() })
+      m.set(f.codigo, {
+        codigo: f.codigo, descripcion: f.descripcion, cliente: f.cliente, grupo: f.grupo,
+        version1: f.version1, version2: f.version2, version3: f.version3, stock: f.stock,
+        meses: new Map(),
+      })
     }
     m.get(f.codigo).meses.set(f.mes, f.consumo_firme || 0)
   }
@@ -17,47 +26,64 @@ function agruparPorCodigo(filas) {
 
 const sumaMeses = mat => [...mat.meses.values()].reduce((a, b) => a + b, 0)
 
-export function compararSnapshots(filasAnterior, filasActual) {
+export function compararExplosiones(filasAnterior, filasActual) {
   const anterior = agruparPorCodigo(filasAnterior)
   const actual = agruparPorCodigo(filasActual)
+  const todosLosCodigos = new Set([...anterior.keys(), ...actual.keys()])
 
-  const nuevos = []
-  const desaparecidos = []
-  const aumentos = []
-  const disminuciones = []
-
-  for (const [codigo, mat] of actual) {
-    if (!anterior.has(codigo)) nuevos.push({ ...mat, consumoFirmeTotal: sumaMeses(mat) })
-  }
-  for (const [codigo, mat] of anterior) {
-    if (!actual.has(codigo)) desaparecidos.push({ ...mat, consumoFirmeTotal: sumaMeses(mat) })
-  }
-
-  for (const [codigo, matActual] of actual) {
+  const filas = []
+  for (const codigo of todosLosCodigos) {
+    const matActual = actual.get(codigo)
     const matAnterior = anterior.get(codigo)
-    if (!matAnterior) continue
-    const cambiosPorMes = []
-    for (const [mes, cantActual] of matActual.meses) {
-      const cantAnterior = matAnterior.meses.get(mes) || 0
-      const diferencia = cantActual - cantAnterior
-      if (diferencia !== 0) cambiosPorMes.push({ mes, cantidadAnterior: cantAnterior, cantidadActual: cantActual, diferencia })
-    }
-    if (!cambiosPorMes.length) continue
-    const diferenciaTotal = cambiosPorMes.reduce((a, c) => a + c.diferencia, 0)
-    const entrada = { codigo, descripcion: matActual.descripcion, cliente: matActual.cliente, grupo: matActual.grupo, cambiosPorMes, diferenciaTotal }
-    if (diferenciaTotal > 0) aumentos.push(entrada)
-    else if (diferenciaTotal < 0) disminuciones.push(entrada)
-    // Si sube en un mes y baja en otro por la misma cantidad neta, se
-    // clasifica igual segun si hubo algun mes que subio -- para que no se
-    // pierda de vista que algo cambio.
-    else if (cambiosPorMes.some(c => c.diferencia > 0)) aumentos.push(entrada)
-    else disminuciones.push(entrada)
+    const base = matActual || matAnterior
+
+    const todosLosMeses = new Set([
+      ...(matAnterior ? matAnterior.meses.keys() : []),
+      ...(matActual ? matActual.meses.keys() : []),
+    ])
+    const meses = [...todosLosMeses].sort().map(mes => {
+      const anteriorCant = matAnterior?.meses.get(mes) || 0
+      const actualCant = matActual?.meses.get(mes) || 0
+      return { mes, anterior: anteriorCant, actual: actualCant, variacion: actualCant - anteriorCant }
+    })
+
+    const consumoAnteriorTotal = matAnterior ? sumaMeses(matAnterior) : 0
+    const consumoActualTotal = matActual ? sumaMeses(matActual) : 0
+    const variacionAbs = consumoActualTotal - consumoAnteriorTotal
+    const variacionPct = consumoAnteriorTotal ? Math.round((variacionAbs / consumoAnteriorTotal) * 1000) / 10 : null
+
+    let categoria
+    if (!matAnterior) categoria = 'nuevo'
+    else if (!matActual) categoria = 'desaparecido'
+    else if (variacionAbs > 0) categoria = 'aumento'
+    else if (variacionAbs < 0) categoria = 'disminucion'
+    else categoria = 'sin_cambio'
+
+    filas.push({
+      codigo,
+      descripcion: base.descripcion,
+      grupo: base.grupo,
+      cliente: base.cliente,
+      revisarVersion: contarClientes(base.cliente) > 1,
+      version1: base.version1,
+      version2: base.version2,
+      version3: base.version3,
+      stock: matActual ? matActual.stock : matAnterior.stock,
+      consumoAnteriorTotal,
+      consumoActualTotal,
+      variacionAbs,
+      variacionPct,
+      categoria,
+      meses,
+    })
   }
 
-  aumentos.sort((a, b) => b.diferenciaTotal - a.diferenciaTotal)
-  disminuciones.sort((a, b) => a.diferenciaTotal - b.diferenciaTotal)
-  nuevos.sort((a, b) => b.consumoFirmeTotal - a.consumoFirmeTotal)
-  desaparecidos.sort((a, b) => b.consumoFirmeTotal - a.consumoFirmeTotal)
+  const prioridad = { nuevo: 0, aumento: 1, disminucion: 2, sin_cambio: 3, desaparecido: 4 }
+  filas.sort((a, b) => {
+    const p = prioridad[a.categoria] - prioridad[b.categoria]
+    if (p !== 0) return p
+    return Math.abs(b.variacionAbs) - Math.abs(a.variacionAbs)
+  })
 
-  return { nuevos, desaparecidos, aumentos, disminuciones }
+  return filas
 }
