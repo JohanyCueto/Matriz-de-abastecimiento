@@ -2,7 +2,9 @@
 create table if not exists programacion_oc (
   id_entrega text primary key,
   fecha_emision_oc date,
-  oc bigint not null,
+  oc bigint not null, -- numero de OC (compras locales) u OI (importaciones)
+  origen text, -- 'Local' (OC) o 'Importado' (OI), derivado de tipo_documento
+  tipo_documento text, -- 'OC' u 'OI', segun el flujo que proceso el PDF
   proveedor text,
   comprador text,
   moneda text,
