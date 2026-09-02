@@ -11,10 +11,46 @@ function mermaPorGrupo(grupo) {
   return 0
 }
 
+// Tope de cobertura de stock por grupo (confirmado con Johany): no tiene
+// sentido comprar para tener guardado mas de esto, aunque el consumo
+// futuro total de la explosion sea mayor -- se vuelve a comprar mas
+// adelante cuando toque. Se usa el maximo del rango que dio Johany para
+// Grupo 3/4 (1.5 a 2 meses).
+function coberturaMesesPorGrupo(grupo) {
+  if (grupo === 1 || grupo === 2) return 2.5
+  if (grupo === 3 || grupo === 4) return 2
+  return null // sin grupo conocido: no se limita, usa todo el horizonte
+}
+
+// Suma el consumo en firme desde el mes actual (calendario real, no el
+// primer mes de la explosion) hacia adelante, hasta completar
+// "mesesCobertura" -- admite fracciones (ej. 2.5 = 2 meses completos +
+// mitad del siguiente), usando los montos reales de cada mes, no un
+// promedio. Si mesesCobertura es null, usa todo el horizonte disponible
+// (mismo comportamiento que antes de tener el tope por grupo).
+function necesidadHastaCobertura(meses, mesesCobertura) {
+  const ordenados = [...meses].sort((a, b) => a.mes.localeCompare(b.mes))
+  if (mesesCobertura == null) return ordenados.reduce((a, m) => a + (m.actual || 0), 0)
+
+  const hoy = new Date()
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+  const futuros = ordenados.filter(m => m.mes >= mesActual)
+
+  let restante = mesesCobertura
+  let total = 0
+  for (const m of futuros) {
+    if (restante <= 0) break
+    total += (m.actual || 0) * Math.min(1, restante)
+    restante -= 1
+  }
+  return total
+}
+
 export function calcularCompraSugerida(filas, ocPorSku) {
   return filas.map(f => {
     const mermaPct = mermaPorGrupo(f.grupo)
-    const necesidad = f.consumoActualTotal || 0
+    const mesesCobertura = coberturaMesesPorGrupo(f.grupo)
+    const necesidad = necesidadHastaCobertura(f.meses, mesesCobertura)
     const oc = ocPorSku.get(f.codigo) || { saldoPendiente: 0, fechaProgramada: null }
     const stock = f.stock || 0
 
@@ -46,6 +82,8 @@ export function calcularCompraSugerida(filas, ocPorSku) {
     return {
       ...f,
       mermaPct,
+      mesesCobertura,
+      necesidadCobertura: necesidad,
       ocPendiente: oc.saldoPendiente,
       fechaEntregaProgramada: oc.fechaProgramada,
       faltanteReal,
