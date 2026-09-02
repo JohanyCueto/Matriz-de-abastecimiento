@@ -31,6 +31,9 @@ const COL = {
   proyectadoInicio: 7,  // H:L, 5 meses de consumo proyectado
   cliente: 31,          // AF
   firmeInicio: 32,      // AG:AK, 5 meses de consumo en firme
+  version1: 42,         // AQ
+  version2: 43,         // AR
+  version3: 44,         // AS
   grupo: 45,             // AT
 }
 const MESES_COUNT = 5
@@ -78,6 +81,9 @@ export async function importarExplosion(file, onStep) {
       stock: toNum(row[COL.stock]),
       disponible: toNum(row[COL.disponible]),
       cuarentena: toNum(row[COL.cuarentena]),
+      version1: cleanText(row[COL.version1]),
+      version2: cleanText(row[COL.version2]),
+      version3: cleanText(row[COL.version3]),
     }
     for (let i = 0; i < MESES_COUNT; i++) {
       materiales.push({
