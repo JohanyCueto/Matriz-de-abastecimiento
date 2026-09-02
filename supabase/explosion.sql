@@ -7,6 +7,10 @@
 create table if not exists explosion_snapshots (
   id bigint generated always as identity primary key,
   archivo text not null,
+  -- Fecha real del archivo (parseada de su nombre, ej. "...2026.08.27.xlsx"),
+  -- no la fecha en que se subio -- para que "anterior vs. actual" no se
+  -- invierta si algun dia hay que volver a subir un archivo viejo.
+  fecha_corte date,
   creado_por uuid references auth.users(id) default auth.uid(),
   creado_en timestamptz not null default now()
 );
