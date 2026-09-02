@@ -1,13 +1,18 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { fmt, fdate } from './lib/derive'
-import { obtenerUltimosSnapshots, obtenerMaterialesDeSnapshot } from './lib/explosionImporter'
+import { obtenerUltimosSnapshots, obtenerMaterialesDeSnapshot, obtenerOcPorSku } from './lib/explosionImporter'
 import { compararExplosiones } from './lib/explosionDiff'
+import { calcularCompraSugerida } from './lib/explosionCompra'
 import ExplosionButton from './ExplosionButton'
 
 const fechaHora = s => s ? new Date(s).toLocaleString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+const mesLabel = s => s ? new Date(s + 'T00:00:00').toLocaleDateString('es-PE', { month: 'long', year: 'numeric' }) : ''
 
 const CAT_TAG = { nuevo: 't-grn', aumento: 't-red', disminucion: 't-blu', sin_cambio: 't-gry', desaparecido: 't-gry' }
 const CAT_LABEL = { nuevo: 'Nuevo', aumento: 'Aumentó', disminucion: 'Disminuyó', sin_cambio: 'Sin cambio', desaparecido: 'Ya no aparece' }
+
+const ESTADO_TAG = { cubierto: 't-grn', a_tiempo: 't-grn', ajustado: 't-amb', en_riesgo: 't-red', sin_oc: 't-red', sin_dato: 't-gry' }
+const ESTADO_LABEL = { cubierto: 'Cubierto', a_tiempo: 'A tiempo', ajustado: 'Ajustado', en_riesgo: 'En riesgo', sin_oc: 'Sin OC', sin_dato: 'Sin dato fabricación' }
 
 export default function Explosion() {
   const [loading, setLoading] = useState(true)
@@ -18,7 +23,10 @@ export default function Explosion() {
 
   const [fGrupo, setFGrupo] = useState('')
   const [fCliente, setFCliente] = useState('')
+  const [fMesFab, setFMesFab] = useState('')
+  const [fEstado, setFEstado] = useState('')
   const [soloCambios, setSoloCambios] = useState(false)
+  const [soloFaltante, setSoloFaltante] = useState(false)
 
   async function cargar() {
     setLoading(true)
@@ -32,7 +40,9 @@ export default function Explosion() {
           obtenerMaterialesDeSnapshot(actual.id),
           obtenerMaterialesDeSnapshot(anterior.id),
         ])
-        setFilas(compararExplosiones(matAnterior, matActual))
+        const comparadas = compararExplosiones(matAnterior, matActual)
+        const ocPorSku = await obtenerOcPorSku(comparadas.map(f => f.codigo))
+        setFilas(calcularCompraSugerida(comparadas, ocPorSku))
       } else {
         setFilas(null)
       }
@@ -46,25 +56,38 @@ export default function Explosion() {
   useEffect(() => { cargar() }, [])
 
   const clientes = useMemo(() => filas ? [...new Set(filas.map(f => f.cliente).filter(Boolean))].sort() : [], [filas])
+  const mesesFab = useMemo(() => filas ? [...new Set(filas.map(f => f.mesFabricacionProximo).filter(Boolean))].sort() : [], [filas])
 
   const filtradas = useMemo(() => {
     if (!filas) return []
     return filas.filter(f => {
       if (fGrupo && String(f.grupo) !== fGrupo) return false
       if (fCliente && f.cliente !== fCliente) return false
+      if (fMesFab && f.mesFabricacionProximo !== fMesFab) return false
+      if (fEstado && f.estadoAbastecimiento !== fEstado) return false
       if (soloCambios && f.categoria === 'sin_cambio') return false
+      if (soloFaltante && f.faltanteReal <= 0) return false
       return true
     })
-  }, [filas, fGrupo, fCliente, soloCambios])
+  }, [filas, fGrupo, fCliente, fMesFab, fEstado, soloCambios, soloFaltante])
 
   const kpis = useMemo(() => {
     if (!filas) return null
-    const contar = cat => filas.filter(f => f.categoria === cat).length
+    const contarCat = cat => filas.filter(f => f.categoria === cat).length
     return {
-      nuevo: contar('nuevo'), aumento: contar('aumento'), disminucion: contar('disminucion'),
-      sin_cambio: contar('sin_cambio'), desaparecido: contar('desaparecido'),
+      nuevo: contarCat('nuevo'),
+      aumento: contarCat('aumento'),
+      disminucion: contarCat('disminucion'),
+      conFaltante: filas.filter(f => f.faltanteReal > 0).length,
+      requierenCompra: filas.filter(f => f.compraSugerida > 0).length,
+      enRiesgo: filas.filter(f => f.estadoAbastecimiento === 'en_riesgo').length,
     }
   }, [filas])
+
+  function limpiar() {
+    setFGrupo(''); setFCliente(''); setFMesFab(''); setFEstado('')
+    setSoloCambios(false); setSoloFaltante(false)
+  }
 
   return (
     <div>
@@ -94,8 +117,9 @@ export default function Explosion() {
             <div className="kpi g"><div className="lb">Materiales nuevos</div><div className="vl">{kpis.nuevo}</div></div>
             <div className="kpi r"><div className="lb">Aumentaron consumo</div><div className="vl">{kpis.aumento}</div></div>
             <div className="kpi a"><div className="lb">Disminuyeron consumo</div><div className="vl">{kpis.disminucion}</div></div>
-            <div className="kpi"><div className="lb">Sin cambios</div><div className="vl">{kpis.sin_cambio}</div></div>
-            <div className="kpi"><div className="lb">Ya no aparecen</div><div className="vl">{kpis.desaparecido}</div></div>
+            <div className="kpi a"><div className="lb">Con faltante</div><div className="vl">{kpis.conFaltante}</div></div>
+            <div className="kpi r"><div className="lb">Requieren compra</div><div className="vl">{kpis.requierenCompra}</div></div>
+            <div className="kpi r"><div className="lb">En riesgo</div><div className="vl">{kpis.enRiesgo}</div></div>
           </div>
 
           <div className="bar">
@@ -107,7 +131,17 @@ export default function Explosion() {
               <option value="">Todos los clientes</option>
               {clientes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            <select value={fMesFab} onChange={e => setFMesFab(e.target.value)}>
+              <option value="">Todos los meses de fabricación</option>
+              {mesesFab.map(m => <option key={m} value={m}>{mesLabel(m)}</option>)}
+            </select>
+            <select value={fEstado} onChange={e => setFEstado(e.target.value)}>
+              <option value="">Todos los estados</option>
+              {Object.keys(ESTADO_LABEL).map(e => <option key={e} value={e}>{ESTADO_LABEL[e]}</option>)}
+            </select>
             <button className={`btn ${soloCambios ? 'act' : ''}`} onClick={() => setSoloCambios(v => !v)}>Solo con cambios</button>
+            <button className={`btn ${soloFaltante ? 'act' : ''}`} onClick={() => setSoloFaltante(v => !v)}>Solo con faltante</button>
+            <button className="btn" onClick={limpiar}>Limpiar</button>
             <span className="count">{fmt(filtradas.length)} materiales</span>
           </div>
 
@@ -126,6 +160,14 @@ export default function Explosion() {
                     <th className="num">Consumo nuevo</th>
                     <th className="num">Variación</th>
                     <th className="num">Variación %</th>
+                    <th>Cambio</th>
+                    <th className="num">OC pendiente</th>
+                    <th className="num">% Merma</th>
+                    <th className="num">Faltante real</th>
+                    <th className="num">Compra sugerida</th>
+                    <th>Mes fabricación</th>
+                    <th>Fecha requerida</th>
+                    <th>Fecha programada</th>
                     <th>Estado</th>
                   </tr>
                 </thead>
@@ -148,11 +190,19 @@ export default function Explosion() {
                         <td className="num">{f.variacionAbs > 0 ? '+' : ''}{fmt(f.variacionAbs)}</td>
                         <td className="num">{f.variacionPct == null ? '' : `${f.variacionPct > 0 ? '+' : ''}${f.variacionPct}%`}</td>
                         <td><span className={`tag ${CAT_TAG[f.categoria]}`}>{CAT_LABEL[f.categoria]}</span></td>
+                        <td className="num">{fmt(f.ocPendiente)}</td>
+                        <td className="num">{f.mermaPct}%</td>
+                        <td className="num">{f.faltanteReal > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.faltanteReal)}</b> : <span className="dim">0</span>}</td>
+                        <td className="num">{f.compraSugerida > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.compraSugerida)}</b> : <span className="dim">0</span>}</td>
+                        <td className="nw">{f.mesFabricacionProximo ? mesLabel(f.mesFabricacionProximo) : <span className="dim">-</span>}</td>
+                        <td className="mono">{f.fechaRequeridaIngreso ? fdate(f.fechaRequeridaIngreso) : <span className="dim">-</span>}</td>
+                        <td className="mono">{f.fechaEntregaProgramada ? fdate(f.fechaEntregaProgramada) : <span className="dim">-</span>}</td>
+                        <td><span className={`tag ${ESTADO_TAG[f.estadoAbastecimiento]}`}>{ESTADO_LABEL[f.estadoAbastecimiento]}</span></td>
                       </tr>
                       {expandido === f.codigo && (
                         <tr>
                           <td></td>
-                          <td colSpan={10}>
+                          <td colSpan={18}>
                             <table className="expl-detalle">
                               <thead>
                                 <tr><th>Mes</th><th className="num">Explosión anterior</th><th className="num">Nueva explosión</th><th className="num">Variación</th></tr>
