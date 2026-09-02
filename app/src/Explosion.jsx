@@ -21,6 +21,8 @@ export default function Explosion() {
   const [filas, setFilas] = useState(null)
   const [expandido, setExpandido] = useState(null)
 
+  const [qInput, setQInput] = useState('')
+  const [q, setQ] = useState('')
   const [fGrupo, setFGrupo] = useState('')
   const [fCliente, setFCliente] = useState('')
   const [fMesFab, setFMesFab] = useState('')
@@ -55,12 +57,24 @@ export default function Explosion() {
 
   useEffect(() => { cargar() }, [])
 
+  // Igual que en Seguimiento OC: espera un momento sin escribir antes de
+  // aplicar la busqueda, para que el cuadro de texto responda al instante.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 250)
+    return () => clearTimeout(t)
+  }, [qInput])
+
   const clientes = useMemo(() => filas ? [...new Set(filas.map(f => f.cliente).filter(Boolean))].sort() : [], [filas])
   const mesesFab = useMemo(() => filas ? [...new Set(filas.map(f => f.mesFabricacionProximo).filter(Boolean))].sort() : [], [filas])
 
   const filtradas = useMemo(() => {
     if (!filas) return []
+    const qq = q.trim().toLowerCase()
     return filas.filter(f => {
+      if (qq) {
+        const busca = `${f.codigo} ${f.descripcion || ''} ${f.cliente || ''}`.toLowerCase()
+        if (!busca.includes(qq)) return false
+      }
       if (fGrupo && String(f.grupo) !== fGrupo) return false
       if (fCliente && f.cliente !== fCliente) return false
       if (fMesFab && f.mesFabricacionProximo !== fMesFab) return false
@@ -69,7 +83,7 @@ export default function Explosion() {
       if (soloFaltante && f.faltanteReal <= 0) return false
       return true
     })
-  }, [filas, fGrupo, fCliente, fMesFab, fEstado, soloCambios, soloFaltante])
+  }, [filas, q, fGrupo, fCliente, fMesFab, fEstado, soloCambios, soloFaltante])
 
   const kpis = useMemo(() => {
     if (!filas) return null
@@ -85,6 +99,7 @@ export default function Explosion() {
   }, [filas])
 
   function limpiar() {
+    setQInput(''); setQ('')
     setFGrupo(''); setFCliente(''); setFMesFab(''); setFEstado('')
     setSoloCambios(false); setSoloFaltante(false)
   }
@@ -123,6 +138,7 @@ export default function Explosion() {
           </div>
 
           <div className="bar">
+            <input type="text" placeholder="Buscar por código, descripción o cliente" value={qInput} onChange={e => setQInput(e.target.value)} />
             <select value={fGrupo} onChange={e => setFGrupo(e.target.value)}>
               <option value="">Todos los grupos</option>
               {[1, 2, 3, 4].map(g => <option key={g} value={g}>Grupo {g}</option>)}
