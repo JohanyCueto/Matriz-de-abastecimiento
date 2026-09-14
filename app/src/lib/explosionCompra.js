@@ -11,6 +11,17 @@ function mermaPorGrupo(grupo) {
   return 0
 }
 
+// Los "tubos" tienen su propia regla de compra, aparte del grupo: el
+// proveedor solo los vende en lotes de 20,000 unidades como minimo, y la
+// merma es siempre 10% (no la del grupo que le haya tocado). Se detectan
+// por la palabra "TUBO" en la descripcion -- unico criterio hoy; si
+// aparecen otras categorias con lote minimo, hay que ampliar esto.
+const LOTE_MINIMO_TUBO = 20000
+const MERMA_TUBO = 10
+function esTubo(descripcion) {
+  return /\btubo\b/i.test(descripcion || '')
+}
+
 // Tope de cobertura de stock por grupo (confirmado con Johany): no tiene
 // sentido comprar para tener guardado mas de esto, aunque el consumo
 // futuro total de la explosion sea mayor -- se vuelve a comprar mas
@@ -24,9 +35,13 @@ function coberturaMesesPorGrupo(grupo) {
 
 // Suma el consumo en firme desde el mes actual (calendario real, no el
 // primer mes de la explosion) hacia adelante, hasta completar
-// "mesesCobertura" -- admite fracciones (ej. 2.5 = 2 meses completos +
-// mitad del siguiente), usando los montos reales de cada mes, no un
-// promedio. Si mesesCobertura es null, usa todo el horizonte disponible
+// "mesesCobertura" meses. Un mes que cae aunque sea parcialmente dentro de
+// la ventana se cuenta completo (redondeando la cantidad de meses hacia
+// arriba), no a prorrata por dias: el consumo real de un mes suele ser una
+// corrida de produccion puntual, no algo repartido parejo dia a dia -- si
+// se necesitan 20,000 unidades en noviembre, hacen falta las 20,000 ese
+// mes, no la mitad aunque noviembre caiga a mitad de la ventana de
+// cobertura. Si mesesCobertura es null, usa todo el horizonte disponible
 // (mismo comportamiento que antes de tener el tope por grupo).
 function necesidadHastaCobertura(meses, mesesCobertura) {
   const ordenados = [...meses].sort((a, b) => a.mes.localeCompare(b.mes))
@@ -36,14 +51,8 @@ function necesidadHastaCobertura(meses, mesesCobertura) {
   const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
   const futuros = ordenados.filter(m => m.mes >= mesActual)
 
-  let restante = mesesCobertura
-  let total = 0
-  for (const m of futuros) {
-    if (restante <= 0) break
-    total += (m.actual || 0) * Math.min(1, restante)
-    restante -= 1
-  }
-  return total
+  const mesesEnteros = Math.ceil(mesesCobertura)
+  return futuros.slice(0, mesesEnteros).reduce((a, m) => a + (m.actual || 0), 0)
 }
 
 // El stock que trae la explosion queda congelado en la fecha del archivo
@@ -55,7 +64,9 @@ function necesidadHastaCobertura(meses, mesesCobertura) {
 // que Johany suba una explosion mas nueva.
 export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map()) {
   return filas.map(f => {
-    const mermaPct = mermaPorGrupo(f.grupo)
+    const tubo = esTubo(f.descripcion)
+    const mermaPct = tubo ? MERMA_TUBO : mermaPorGrupo(f.grupo)
+    const loteMinimo = tubo ? LOTE_MINIMO_TUBO : null
     const mesesCobertura = coberturaMesesPorGrupo(f.grupo)
     const necesidad = necesidadHastaCobertura(f.meses, mesesCobertura)
     const oc = ocPorSku.get(f.codigo) || { saldoPendiente: 0, fechaProgramada: null, entregas: [] }
@@ -66,7 +77,12 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
     // La merma se aplica sobre lo que de verdad falta comprar, no sobre
     // toda la necesidad -- si el stock y las OC ya cubren el consumo, no
     // hace falta agregar margen de merma a algo que no se va a comprar.
-    const compraSugerida = Math.ceil(faltanteReal * (1 + mermaPct / 100))
+    const conMerma = Math.ceil(faltanteReal * (1 + mermaPct / 100))
+    // El lote minimo es un piso del proveedor, no se le suma merma aparte:
+    // si el faltante ya alcanza para pedir mas de un lote, se compra
+    // exactamente lo que hace falta (+ merma), sin redondear a multiplos.
+    const loteMinimoAplicado = faltanteReal > 0 && loteMinimo && faltanteReal < loteMinimo
+    const compraSugerida = faltanteReal <= 0 ? 0 : loteMinimoAplicado ? loteMinimo : conMerma
 
     let estadoAbastecimiento
     if (faltanteReal <= 0) {
@@ -96,6 +112,7 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
     return {
       ...f,
       mermaPct,
+      loteMinimoAplicado,
       mesesCobertura,
       necesidadCobertura: necesidad,
       ocPendiente: oc.saldoPendiente,
