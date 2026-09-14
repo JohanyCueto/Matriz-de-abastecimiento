@@ -163,12 +163,12 @@ export default function Explosion() {
 
           <div className="tw">
             <div className="scroll">
-              <table>
+              <table className="expl-tbl">
                 <thead>
                   <tr>
-                    <th></th>
-                    <th>Código</th>
-                    <th>Descripción</th>
+                    <th className="stk stk-a"></th>
+                    <th className="stk stk-b">Código</th>
+                    <th className="stk stk-c">Descripción</th>
                     <th>Grupo</th>
                     <th>Cliente</th>
                     <th className="num">Stock</th>
@@ -191,14 +191,14 @@ export default function Explosion() {
                   {filtradas.map(f => (
                     <Fragment key={f.codigo}>
                       <tr onClick={() => setExpandido(e => e === f.codigo ? null : f.codigo)}>
-                        <td className="dim">{expandido === f.codigo ? '▾' : '▸'}</td>
-                        <td className="mono">{f.codigo}</td>
-                        <td><div className="dsc">{f.descripcion || ''}</div></td>
+                        <td className="dim stk stk-a">{expandido === f.codigo ? '▾' : '▸'}</td>
+                        <td className="mono stk stk-b">{f.codigo}</td>
+                        <td className="stk stk-c"><div className="dsc">{f.descripcion || ''}</div></td>
                         <td>{f.grupo ?? ''}</td>
                         <td>
                           {f.revisarVersion
                             ? <span className="tag t-amb">Revisar versión</span>
-                            : (f.cliente || '')}
+                            : <div className="cli">{f.cliente || ''}</div>}
                         </td>
                         <td className="num">{fmt(f.stock)}</td>
                         <td className="num">{fmt(f.consumoAnteriorTotal)}</td>
