@@ -234,3 +234,21 @@ export async function obtenerOcPorSku(codigos) {
   }
   return m
 }
+
+// El stock que trae la explosion es una foto fija del dia que se armo el
+// archivo (fecha_corte). Un ingreso que llega despues de esa fecha ya deja
+// de contar como "OC pendiente" (obtenerOcPorSku), pero el stock del
+// archivo todavia no lo tiene -- sin esto, esas unidades parecian
+// esfumarse hasta que Johany suba una explosion mas nueva. Se suma por
+// separado desde ingresos_sistema, que si se actualiza con cada Excel que
+// ella sube.
+export async function obtenerIngresosPosterioresA(codigos, fechaCorte) {
+  const m = new Map()
+  if (!codigos.length || !fechaCorte) return m
+  const data = await fetchAll('ingresos_sistema', 'codigo,cantidad_ingresada,fecha_ingreso',
+    q => q.in('codigo', codigos).gt('fecha_ingreso', fechaCorte))
+  for (const row of data) {
+    m.set(row.codigo, (m.get(row.codigo) || 0) + (row.cantidad_ingresada || 0))
+  }
+  return m
+}

@@ -46,13 +46,21 @@ function necesidadHastaCobertura(meses, mesesCobertura) {
   return total
 }
 
-export function calcularCompraSugerida(filas, ocPorSku) {
+// El stock que trae la explosion queda congelado en la fecha del archivo
+// (fecha_corte): si una OC ingresa despues de esa fecha, deja de contar
+// como "pendiente" pero el stock del archivo todavia no la tiene -- se
+// veia como si esas unidades hubieran desaparecido. Se suma aparte lo que
+// ya ingreso a almacen despues del corte (ingresosPorSku, sacado de
+// ingresos_sistema) para que el stock efectivo sea real, sin esperar a
+// que Johany suba una explosion mas nueva.
+export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map()) {
   return filas.map(f => {
     const mermaPct = mermaPorGrupo(f.grupo)
     const mesesCobertura = coberturaMesesPorGrupo(f.grupo)
     const necesidad = necesidadHastaCobertura(f.meses, mesesCobertura)
     const oc = ocPorSku.get(f.codigo) || { saldoPendiente: 0, fechaProgramada: null, entregas: [] }
-    const stock = f.stock || 0
+    const ingresosPosterioresAlCorte = ingresosPorSku.get(f.codigo) || 0
+    const stock = (f.stock || 0) + ingresosPosterioresAlCorte
 
     const faltanteReal = Math.max(0, necesidad - stock - oc.saldoPendiente)
     // La merma se aplica sobre lo que de verdad falta comprar, no sobre
@@ -87,6 +95,8 @@ export function calcularCompraSugerida(filas, ocPorSku) {
       ocPendiente: oc.saldoPendiente,
       ocEntregas: oc.entregas,
       fechaEntregaProgramada: oc.fechaProgramada,
+      stockEfectivo: stock,
+      ingresosPosterioresAlCorte,
       faltanteReal,
       compraSugerida,
       estadoAbastecimiento,
