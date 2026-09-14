@@ -71,6 +71,12 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
     let estadoAbastecimiento
     if (faltanteReal <= 0) {
       estadoAbastecimiento = 'cubierto'
+    } else if (f.fechaRequeridaIngreso && new Date(f.fechaRequeridaIngreso) < new Date()) {
+      // Ya paso la fecha en la que se necesitaba el material para fabricar
+      // y todavia falta -- esto ya no es un riesgo a futuro (como
+      // "en_riesgo", que compara contra una OC que todavia va a llegar):
+      // es una ruptura de stock real, haya o no una OC en camino.
+      estadoAbastecimiento = 'quiebre'
     } else if (!oc.fechaProgramada) {
       estadoAbastecimiento = 'sin_oc'
     } else if (!f.fechaRequeridaIngreso) {

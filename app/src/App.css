@@ -128,6 +128,10 @@ tbody tr.sel{background:#f2f5f9}
 .t-red{background:var(--redbg);color:var(--red)} .t-amb{background:var(--ambbg);color:var(--amb)}
 .t-grn{background:var(--grnbg);color:var(--grn)} .t-blu{background:var(--blubg);color:var(--blu)}
 .t-gry{background:var(--grybg);color:var(--gry)}
+/* Mas grave que "En riesgo" (que compara contra una fecha futura): la
+   fecha en la que se necesitaba el material ya paso y sigue faltando. Rojo
+   solido para que no se confunda con el resto de etiquetas rojas. */
+.t-quiebre{background:var(--red);color:#fff}
 
 .pbar{width:62px;height:5px;background:#eeeef1;border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle}
 .pbar i{display:block;height:100%;border-radius:3px;background:var(--acc)}

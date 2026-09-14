@@ -11,8 +11,8 @@ const mesLabel = s => s ? new Date(s + 'T00:00:00').toLocaleDateString('es-PE', 
 const CAT_TAG = { nuevo: 't-grn', aumento: 't-red', disminucion: 't-blu', sin_cambio: 't-gry', desaparecido: 't-gry' }
 const CAT_LABEL = { nuevo: 'Nuevo', aumento: 'Aumentó', disminucion: 'Disminuyó', sin_cambio: 'Sin cambio', desaparecido: 'Ya no aparece' }
 
-const ESTADO_TAG = { cubierto: 't-grn', a_tiempo: 't-grn', ajustado: 't-amb', en_riesgo: 't-red', sin_oc: 't-red', sin_dato: 't-gry' }
-const ESTADO_LABEL = { cubierto: 'Cubierto', a_tiempo: 'A tiempo', ajustado: 'Ajustado', en_riesgo: 'En riesgo', sin_oc: 'Sin OC', sin_dato: 'Sin dato fabricación' }
+const ESTADO_TAG = { cubierto: 't-grn', a_tiempo: 't-grn', ajustado: 't-amb', en_riesgo: 't-red', sin_oc: 't-red', sin_dato: 't-gry', quiebre: 't-quiebre' }
+const ESTADO_LABEL = { cubierto: 'Cubierto', a_tiempo: 'A tiempo', ajustado: 'Ajustado', en_riesgo: 'En riesgo', sin_oc: 'Sin OC', sin_dato: 'Sin dato fabricación', quiebre: 'Ruptura de stock' }
 
 export default function Explosion() {
   const [loading, setLoading] = useState(true)
@@ -101,6 +101,7 @@ export default function Explosion() {
       conFaltante: filas.filter(f => f.faltanteReal > 0).length,
       requierenCompra: filas.filter(f => f.compraSugerida > 0).length,
       enRiesgo: filas.filter(f => f.estadoAbastecimiento === 'en_riesgo').length,
+      quiebre: filas.filter(f => f.estadoAbastecimiento === 'quiebre').length,
     }
   }, [filas])
 
@@ -141,6 +142,7 @@ export default function Explosion() {
             <div className="kpi a"><div className="lb">Con faltante</div><div className="vl">{kpis.conFaltante}</div></div>
             <div className="kpi r"><div className="lb">Requieren compra</div><div className="vl">{kpis.requierenCompra}</div></div>
             <div className="kpi r"><div className="lb">En riesgo</div><div className="vl">{kpis.enRiesgo}</div></div>
+            <div className="kpi r"><div className="lb">Ruptura de stock</div><div className="vl">{kpis.quiebre}</div></div>
           </div>
 
           <div className="bar">
