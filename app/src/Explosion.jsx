@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, fdate } from './lib/derive'
-import { obtenerUltimosSnapshots, obtenerMaterialesDeSnapshot, obtenerOcPorSku } from './lib/explosionImporter'
+import { obtenerUltimosSnapshots, obtenerMaterialesDeSnapshot, obtenerOcPorSku, obtenerIngresosPosterioresA } from './lib/explosionImporter'
 import { compararExplosiones } from './lib/explosionDiff'
 import { calcularCompraSugerida } from './lib/explosionCompra'
 import ExplosionButton from './ExplosionButton'
@@ -45,8 +45,12 @@ export default function Explosion() {
           obtenerMaterialesDeSnapshot(anterior.id),
         ])
         const comparadas = compararExplosiones(matAnterior, matActual)
-        const ocPorSku = await obtenerOcPorSku(comparadas.map(f => f.codigo))
-        setFilas(calcularCompraSugerida(comparadas, ocPorSku))
+        const codigos = comparadas.map(f => f.codigo)
+        const [ocPorSku, ingresosPorSku] = await Promise.all([
+          obtenerOcPorSku(codigos),
+          obtenerIngresosPosterioresA(codigos, actual.fecha_corte),
+        ])
+        setFilas(calcularCompraSugerida(comparadas, ocPorSku, ingresosPorSku))
       } else {
         setFilas(null)
       }
@@ -207,7 +211,12 @@ export default function Explosion() {
                             ? <span className="tag t-amb">Revisar versión</span>
                             : <div className="cli">{f.cliente || ''}</div>}
                         </td>
-                        <td className="num">{fmt(f.stock)}</td>
+                        <td className="num">
+                          {fmt(f.stockEfectivo)}
+                          {f.ingresosPosterioresAlCorte > 0 && (
+                            <div className="pct" style={{ margin: '2px 0 0' }}>+{fmt(f.ingresosPosterioresAlCorte)} después del corte</div>
+                          )}
+                        </td>
                         <td className="num">{fmt(f.consumoAnteriorTotal)}</td>
                         <td className="num">{fmt(f.consumoActualTotal)}</td>
                         <td className="num">{f.variacionAbs > 0 ? '+' : ''}{fmt(f.variacionAbs)}</td>
