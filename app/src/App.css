@@ -73,6 +73,15 @@ select{cursor:pointer;min-width:150px}
 .expl-detalle th,.expl-detalle td{padding:7px 12px;font-size:12.2px}
 .expl-detalle thead th{position:static;background:transparent;border-bottom:1px solid var(--line2)}
 .scroll{overflow-x:auto;max-height:660px;overflow-y:auto}
+.scroll::-webkit-scrollbar{height:12px}
+.scroll::-webkit-scrollbar-track{background:var(--bg)}
+.scroll::-webkit-scrollbar-thumb{background:#c3c7d1;border-radius:6px}
+.scroll::-webkit-scrollbar-thumb:hover{background:#a3a9b7}
+
+/* Botones para mover la tabla, por si el navegador esconde la barra de
+   desplazamiento (pasa seguido con mouse/touchpad sin scroll horizontal). */
+.expl-scrollbar{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line)}
+.expl-scrollbar .btn{padding:5px 11px;font-size:11.5px}
 table{width:100%;border-collapse:collapse;font-size:12.8px}
 thead th{
   position:sticky;top:0;background:#fbfbfc;z-index:2;text-align:left;
