@@ -231,7 +231,10 @@ export default function Explosion() {
                         </td>
                         <td className="num">{f.mermaPct}%</td>
                         <td className="num">{f.faltanteReal > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.faltanteReal)}</b> : <span className="dim">0</span>}</td>
-                        <td className="num">{f.compraSugerida > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.compraSugerida)}</b> : <span className="dim">0</span>}</td>
+                        <td className="num">
+                          {f.compraSugerida > 0 ? <b style={{ fontWeight: 500 }}>{fmt(f.compraSugerida)}</b> : <span className="dim">0</span>}
+                          {f.loteMinimoAplicado && <div className="pct" style={{ margin: '2px 0 0' }}>lote mínimo</div>}
+                        </td>
                         <td className="nw">{f.mesFabricacionProximo ? mesLabel(f.mesFabricacionProximo) : <span className="dim">-</span>}</td>
                         <td className="mono">{f.fechaRequeridaIngreso ? fdate(f.fechaRequeridaIngreso) : <span className="dim">-</span>}</td>
                         <td className="mono">{f.fechaEntregaProgramada ? fdate(f.fechaEntregaProgramada) : <span className="dim">-</span>}</td>
