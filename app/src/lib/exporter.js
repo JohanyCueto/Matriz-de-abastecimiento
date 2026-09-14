@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
-import { supabase } from './supabaseClient'
 import { EXPORT_COLUMNS } from './schema'
+import { fetchAll } from './importer'
 
 // Supabase devuelve las columnas "date" como "2026-02-07" pero las
 // "timestamptz" como "2026-02-07T00:00:00+00:00". Si no se distinguen bien
@@ -25,8 +25,7 @@ const headerDe = field => EXPORT_COLUMNS.find(c => c.field === field).header
 const ref = field => `[@[${headerDe(field)}]]`
 
 export async function exportarExcel() {
-  const { data, error } = await supabase.from('programacion_oc').select('*').order('oc')
-  if (error) throw error
+  const data = await fetchAll('programacion_oc', '*', q => q.order('oc'))
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('ProgramacionOC')

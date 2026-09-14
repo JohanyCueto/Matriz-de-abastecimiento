@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
-import { supabase } from './supabaseClient'
 import { TOLERANCIA_MARGEN } from './derive'
+import { fetchAll } from './importer'
 
 function descargarBlob(blob, nombre) {
   const url = URL.createObjectURL(blob)
@@ -20,9 +20,7 @@ function descargarBlob(blob, nombre) {
 // total de nuevo, en vez de solo el saldo real). La unidad de medida se
 // deja fija en "UNIDAD" porque hoy todo lo que se maneja se cuenta asi.
 export async function exportarCuadroAlmacen() {
-  const { data, error } = await supabase.from('programacion_oc')
-    .select('sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,cant_ingresada,saldo_pendiente,estado_gestion')
-  if (error) throw error
+  const data = await fetchAll('programacion_oc', 'sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,cant_ingresada,saldo_pendiente,estado_gestion')
 
   // Para almacen lo que importa es si ya llego lo suficiente, no si Johany
   // ya cerro la linea de gestion a mano (eso puede tardar en pasar). Si el

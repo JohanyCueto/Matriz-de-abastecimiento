@@ -52,12 +52,17 @@ export function mapRow(rawRow, columns) {
   return out
 }
 
-async function fetchAll(table, select) {
+// Supabase (PostgREST) nunca devuelve mas de 1000 filas en un solo select,
+// aunque no se ponga ningun .limit() -- lo corta solo. Sin esto, cualquier
+// tabla que crezca mas alla de eso empieza a perder filas en silencio, sin
+// ningun error. Se usa para toda lectura completa de una tabla, no solo al
+// importar.
+export async function fetchAll(table, select, filter = q => q) {
   const pageSize = 1000
   let from = 0
   let all = []
   while (true) {
-    const { data, error } = await supabase.from(table).select(select).range(from, from + pageSize - 1)
+    const { data, error } = await filter(supabase.from(table).select(select)).range(from, from + pageSize - 1)
     if (error) throw error
     all = all.concat(data)
     if (data.length < pageSize) break

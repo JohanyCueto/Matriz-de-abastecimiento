@@ -3,6 +3,7 @@ import { supabase } from './lib/supabaseClient'
 import { useSesion } from './lib/auth'
 import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
 import { ultimasImportaciones, hace } from './lib/importaciones'
+import { fetchAll } from './lib/importer'
 import Panel from './Panel'
 import Recordatorio from './Recordatorio'
 import ImportButton from './ImportButton'
@@ -61,9 +62,14 @@ export default function App() {
   async function cargar() {
     setLoading(true)
     setErr(null)
-    const { data, error } = await supabase.from('programacion_oc').select('*')
-    if (error) { setErr(error.message); setLoading(false); return }
-    setRows(withEntregas(data.map(enrich)))
+    try {
+      const data = await fetchAll('programacion_oc', '*')
+      setRows(withEntregas(data.map(enrich)))
+    } catch (e) {
+      setErr(e.message)
+      setLoading(false)
+      return
+    }
     setLoading(false)
     ultimasImportaciones().then(setImportaciones).catch(() => {})
   }

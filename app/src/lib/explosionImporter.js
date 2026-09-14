@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
-import { insertInBatches } from './importer'
+import { insertInBatches, fetchAll } from './importer'
 import { CERRADAS } from './derive'
 
 // El texto de los encabezados de mes trae el año y cambia cada ciclo (ej.
@@ -197,12 +197,12 @@ export async function obtenerUltimosSnapshots(n = 2) {
 }
 
 export async function obtenerMaterialesDeSnapshot(snapshotId) {
-  const { data, error } = await supabase
-    .from('explosion_materiales')
-    .select('*')
-    .eq('snapshot_id', snapshotId)
-  if (error) throw error
-  return data
+  // Un snapshot completo son ~5 filas por material (una por mes): con mas
+  // de 200 materiales ya se pasa de las 1000 filas que Supabase devuelve
+  // como maximo en un solo select. Sin paginar, se perdian materiales en
+  // silencio y aparecian como "Nuevo" o "Ya no aparece" sin serlo -- por
+  // eso salian ~113 materiales nuevos cuando en realidad eran ~9.
+  return fetchAll('explosion_materiales', '*', q => q.eq('snapshot_id', snapshotId))
 }
 
 // Para cada codigo, suma el saldo pendiente de todas sus entregas
@@ -218,11 +218,7 @@ export async function obtenerMaterialesDeSnapshot(snapshotId) {
 export async function obtenerOcPorSku(codigos) {
   const m = new Map()
   if (!codigos.length) return m
-  const { data, error } = await supabase
-    .from('programacion_oc')
-    .select('oc,sku,saldo_pendiente,fecha_programada_ingreso,estado_gestion')
-    .in('sku', codigos)
-  if (error) throw error
+  const data = await fetchAll('programacion_oc', 'oc,sku,saldo_pendiente,fecha_programada_ingreso,estado_gestion', q => q.in('sku', codigos))
   for (const row of data) {
     if (!m.has(row.sku)) m.set(row.sku, { saldoPendiente: 0, fechaProgramada: null, entregas: [] })
     const acc = m.get(row.sku)
