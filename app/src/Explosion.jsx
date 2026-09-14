@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, fdate } from './lib/derive'
 import { obtenerUltimosSnapshots, obtenerMaterialesDeSnapshot, obtenerOcPorSku } from './lib/explosionImporter'
 import { compararExplosiones } from './lib/explosionDiff'
@@ -29,6 +29,8 @@ export default function Explosion() {
   const [fEstado, setFEstado] = useState('')
   const [soloCambios, setSoloCambios] = useState(false)
   const [soloFaltante, setSoloFaltante] = useState(false)
+  const scrollRef = useRef(null)
+  const moverScroll = dir => scrollRef.current?.scrollBy({ left: dir * 360, behavior: 'smooth' })
 
   async function cargar() {
     setLoading(true)
@@ -162,7 +164,12 @@ export default function Explosion() {
           </div>
 
           <div className="tw">
-            <div className="scroll">
+            <div className="expl-scrollbar">
+              <span className="dim" style={{ fontSize: '11.5px' }}>Mover la tabla:</span>
+              <button className="btn" onClick={() => moverScroll(-1)}>◂ Izquierda</button>
+              <button className="btn" onClick={() => moverScroll(1)}>Derecha ▸</button>
+            </div>
+            <div className="scroll" ref={scrollRef}>
               <table className="expl-tbl">
                 <thead>
                   <tr>
