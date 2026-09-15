@@ -18,10 +18,13 @@ function parseMesHeader(v) {
   return `${anio}-${String(mes).padStart(2, '0')}-01`
 }
 
-// Posiciones de columna en la hoja "explosion" (0-based, A=0). Se lee por
-// posicion y no por nombre de encabezado porque el nombre trae el año y
-// cambia cada ciclo. Si Roxfarma reordena su plantilla, hay que ajustar
-// estos indices.
+// Las primeras columnas de la hoja "explosion" (0-based, A=0) son fijas.
+// Las que vienen despues se mueven cada ciclo -- cada mes que pasa,
+// Roxfarma le saca la columna del mes que ya quedo atras (antes
+// Ago-Dic, ahora Set-Dic), y de vez en cuando agrega columnas nuevas
+// (ej. "OC EN TRANSITO", "OC 1"..."OC 4") que corren todo lo que viene
+// despues. Por eso las columnas desde "Cliente" en adelante se ubican por
+// el texto del encabezado, no por una posicion fija.
 const COL = {
   tipo: 0,
   codigo: 1,
@@ -29,15 +32,40 @@ const COL = {
   disponible: 3,
   cuarentena: 4,
   stock: 5,
-  proyectadoInicio: 7,  // H:L, 5 meses de consumo proyectado
-  cliente: 31,          // AF
-  firmeInicio: 32,      // AG:AK, 5 meses de consumo en firme
-  version1: 42,         // AQ
-  version2: 43,         // AR
-  version3: 44,         // AS
-  grupo: 45,             // AT
 }
-const MESES_COUNT = 5
+
+const normalizarHeader = v => String(v || '').trim().toLowerCase()
+
+// Ubica por texto las columnas que se mueven de ciclo en ciclo, y cuenta
+// cuantos meses trae de verdad el bloque de consumo en firme (antes eran
+// siempre 5, ahora pueden ser menos) en vez de asumir un numero fijo.
+function detectarColumnasVariables(header) {
+  const unidadIdx = header.findIndex(h => normalizarHeader(h) === 'unidad')
+  if (unidadIdx === -1) {
+    throw new Error('No se encontró la columna "unidad" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.')
+  }
+  const clienteIdx = header.findIndex(h => normalizarHeader(h) === 'cliente')
+  if (clienteIdx === -1) {
+    throw new Error('No se encontró la columna "Cliente" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.')
+  }
+  const grupo = header.findIndex(h => /^grupos?$/.test(normalizarHeader(h)))
+  if (grupo === -1) {
+    throw new Error('No se encontró la columna "Grupos" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.')
+  }
+
+  const proyectadoInicio = unidadIdx + 1
+  const firmeInicio = clienteIdx + 1
+  let mesesCount = 0
+  while (parseMesHeader(header[firmeInicio + mesesCount])) mesesCount++
+  if (mesesCount === 0) {
+    throw new Error(`No se pudo leer ningún mes de consumo en firme despues de la columna "Cliente" (encabezado: "${header[firmeInicio]}"). Puede que la plantilla haya cambiado de columnas.`)
+  }
+
+  const versionCols = []
+  header.forEach((h, i) => { if (normalizarHeader(h).startsWith('version')) versionCols.push(i) })
+
+  return { proyectadoInicio, cliente: clienteIdx, firmeInicio, mesesCount, version1: versionCols[0], version2: versionCols[1], version3: versionCols[2], grupo }
+}
 
 // Posiciones en la hoja "explosion_detallada." (ojo el punto final en el
 // nombre). Solo se usan para calcular el mes de fabricacion mas proximo
@@ -87,13 +115,10 @@ export async function importarExplosion(file, onStep) {
   const header = rows[0] || []
   const dataRows = rows.slice(1)
 
+  const V = detectarColumnasVariables(header)
   const mesFechas = []
-  for (let i = 0; i < MESES_COUNT; i++) {
-    const fecha = parseMesHeader(header[COL.firmeInicio + i])
-    if (!fecha) {
-      throw new Error(`No se pudo leer el mes de la columna de consumo en firme #${i + 1} (encabezado: "${header[COL.firmeInicio + i]}"). Puede que la plantilla haya cambiado de columnas.`)
-    }
-    mesFechas.push(fecha)
+  for (let i = 0; i < V.mesesCount; i++) {
+    mesFechas.push(parseMesHeader(header[V.firmeInicio + i]))
   }
 
   onStep?.('Buscando el mes de fabricación...')
@@ -125,23 +150,23 @@ export async function importarExplosion(file, onStep) {
     const base = {
       codigo,
       descripcion: cleanText(row[COL.descripcion]),
-      cliente: cleanText(row[COL.cliente]),
-      grupo: row[COL.grupo] != null ? (parseInt(row[COL.grupo], 10) || null) : null,
+      cliente: cleanText(row[V.cliente]),
+      grupo: row[V.grupo] != null ? (parseInt(row[V.grupo], 10) || null) : null,
       stock: toNum(row[COL.stock]),
       disponible: toNum(row[COL.disponible]),
       cuarentena: toNum(row[COL.cuarentena]),
-      version1: cleanText(row[COL.version1]),
-      version2: cleanText(row[COL.version2]),
-      version3: cleanText(row[COL.version3]),
+      version1: cleanText(row[V.version1]),
+      version2: cleanText(row[V.version2]),
+      version3: cleanText(row[V.version3]),
       mes_fabricacion_proximo: mesFabricacionProximo ? fechaStr(mesFabricacionProximo) : null,
       fecha_requerida_ingreso: mesFabricacionProximo ? fechaStr(fechaRequeridaDesdeFabricacion(mesFabricacionProximo)) : null,
     }
-    for (let i = 0; i < MESES_COUNT; i++) {
+    for (let i = 0; i < V.mesesCount; i++) {
       materiales.push({
         ...base,
         mes: mesFechas[i],
-        consumo_proyectado: toNum(row[COL.proyectadoInicio + i]),
-        consumo_firme: toNum(row[COL.firmeInicio + i]),
+        consumo_proyectado: toNum(row[V.proyectadoInicio + i]),
+        consumo_firme: toNum(row[V.firmeInicio + i]),
       })
     }
   }
