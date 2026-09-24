@@ -1,23 +1,33 @@
 import { useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
-import { fmt, fdate } from './lib/derive'
+import { fmt, fdate, nombreMes } from './lib/derive'
 
 export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
   const [seleccion, setSeleccion] = useState(new Set())
   const [guardando, setGuardando] = useState(false)
+  const [mes, setMes] = useState('')
 
   // Nunca comunicadas a almacen (fecha_comunicada_almacen vacia): mientras
   // no se marquen aqui, el Cuadro Almacen no las muestra.
-  const porComunicar = useMemo(() => rows
+  const porComunicarTodas = useMemo(() => rows
     .filter(r => !r.fecha_comunicada_almacen && r.fecha_programada_ingreso)
     .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso)), [rows])
+
+  const meses = useMemo(() => {
+    const claves = [...new Set(porComunicarTodas.map(r => r.fecha_programada_ingreso.slice(0, 7)))].sort()
+    return claves.map(k => ({ valor: k, etiqueta: nombreMes(k) }))
+  }, [porComunicarTodas])
+
+  const porComunicar = useMemo(() => porComunicarTodas
+    .filter(r => !mes || r.fecha_programada_ingreso.slice(0, 7) === mes), [porComunicarTodas, mes])
 
   // Ya comunicadas antes, pero la fecha vigente se movio desde entonces
   // (reprogramacion). Es solo informativo: el Cuadro Almacen ya las
   // muestra solas con su "Nueva fecha programada", no hace falta marcarlas.
   const conCambio = useMemo(() => rows
     .filter(r => r.fecha_comunicada_almacen && r.fecha_programada_ingreso && r.fecha_comunicada_almacen !== r.fecha_programada_ingreso)
-    .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso)), [rows])
+    .filter(r => !mes || r.fecha_programada_ingreso.slice(0, 7) === mes)
+    .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso)), [rows, mes])
 
   function toggle(id) {
     setSeleccion(prev => {
@@ -63,6 +73,10 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
           </div>
 
           <div className="mdl-ctrl">
+            <select value={mes} onChange={e => { setMes(e.target.value); setSeleccion(new Set()) }}>
+              <option value="">Todos los meses</option>
+              {meses.map(m => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}
+            </select>
             <button className="btn" onClick={toggleTodas} disabled={!porComunicar.length}>
               {seleccion.size === porComunicar.length && porComunicar.length ? 'Quitar seleccion' : 'Seleccionar todas'}
             </button>
