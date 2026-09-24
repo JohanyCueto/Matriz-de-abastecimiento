@@ -6,6 +6,7 @@ import { ultimasImportaciones, hace } from './lib/importaciones'
 import { fetchAll } from './lib/importer'
 import Panel from './Panel'
 import Recordatorio from './Recordatorio'
+import ComunicarAlmacen from './ComunicarAlmacen'
 import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
@@ -44,6 +45,7 @@ export default function App() {
   const [err, setErr] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
+  const [mostrarComunicar, setMostrarComunicar] = useState(false)
   const [vista, setVista] = useState('oc')
 
   const [qInput, setQInput] = useState('')
@@ -287,6 +289,7 @@ export default function App() {
             {esEditor && <ImportIngresosButton onDone={cargar} />}
             <ExportButton />
             <ExportAlmacenButton />
+            {esEditor && <button className="btn" onClick={() => setMostrarComunicar(true)}>Comunicar a almacen</button>}
             <button className="btn" onClick={() => setMostrarRecordatorio(true)}>Recordatorio proveedor</button>
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
@@ -324,6 +327,10 @@ export default function App() {
 
       {mostrarRecordatorio && (
         <Recordatorio rows={rows} proveedores={proveedores} onClose={() => setMostrarRecordatorio(false)} />
+      )}
+
+      {mostrarComunicar && (
+        <ComunicarAlmacen rows={rows} onClose={() => setMostrarComunicar(false)} onActualizado={cargar} />
       )}
     </div>
   )

@@ -35,31 +35,35 @@ export function nombreMes(clave) {
 // El cuadro que Johany sube a la carpeta compartida de SharePoint para
 // almacen, un archivo por mes (como ella ya los organiza: "SETIEMBRE ME",
 // etc.). Formato acordado con almacen:
-// - "Fecha ingreso almacen" es la fecha que se les comunico la primera vez
-//   y no se toca despues (queda igual aunque la entrega se reprograme).
-// - "Nueva fecha programada" solo se llena si la entrega de verdad se
-//   reprogramo desde la app (eso es lo que guarda el historial); si nunca
-//   se toco, queda vacia.
+// - "Fecha ingreso almacen" es la fecha que se le comunico a almacen la
+//   primera vez (fecha_comunicada_almacen), no la que calcula el sistema
+//   internamente: no se toca despues aunque la entrega se reprograme.
+// - Mientras una entrega no se haya marcado como comunicada (panel
+//   "Comunicar a almacen"), no sale en este cuadro, aunque ya tenga fecha
+//   programada en el sistema: todavia no se le aviso a almacen.
+// - "Nueva fecha programada" solo se llena si la fecha vigente ya no es
+//   la misma que se comunico (se reprogramo despues de avisarle).
 // - "Status" es Ingreso si ya se registro una fecha real de llegada,
 //   Pendiente si todavia no llega nada.
 // - "Observaciones" anota la fecha real en que llego, para que quede el
 //   registro aunque el status ya diga "Ingreso".
-// Se filtra por el mes de la fecha ORIGINAL (cuando se le aviso a almacen
-// por primera vez), no por la fecha vigente, para que una entrega no se
-// "mueva" de mes en el archivo solo porque se reprogramo.
+// Se filtra por el mes en que se comunico (no por la fecha vigente), para
+// que una entrega no se "mueva" de mes en el archivo solo porque se
+// reprogramo despues de avisada.
 export async function exportarCuadroAlmacen(mesClave) {
   const data = await fetchAll('programacion_oc',
-    'sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,fecha_real_ingreso,historial')
+    'sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,fecha_real_ingreso,fecha_comunicada_almacen')
 
-  const conOrigen = data.map(r => {
-    const hist = Array.isArray(r.historial) ? r.historial : []
-    const origen = hist.length ? hist[0].de : r.fecha_programada_ingreso
-    const reprogramada = hist.length ? r.fecha_programada_ingreso : null
-    return { ...r, origen, reprogramada }
-  })
+  const conOrigen = data
+    .filter(r => r.fecha_comunicada_almacen)
+    .map(r => ({
+      ...r,
+      origen: r.fecha_comunicada_almacen,
+      reprogramada: r.fecha_programada_ingreso !== r.fecha_comunicada_almacen ? r.fecha_programada_ingreso : null,
+    }))
 
   const delMes = conOrigen
-    .filter(r => r.origen && r.origen.slice(0, 7) === mesClave)
+    .filter(r => r.origen.slice(0, 7) === mesClave)
     .sort((a, b) => a.origen.localeCompare(b.origen))
 
   const wb = new ExcelJS.Workbook()
