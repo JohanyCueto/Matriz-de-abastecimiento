@@ -71,7 +71,7 @@ export async function fetchAll(table, select, filter = q => q) {
   return all
 }
 
-async function upsertInBatches(table, rows, onConflict, size = 200) {
+export async function upsertInBatches(table, rows, onConflict, size = 200) {
   for (let i = 0; i < rows.length; i += size) {
     const batch = rows.slice(i, i + size)
     const { error } = await supabase.from(table).upsert(batch, { onConflict })

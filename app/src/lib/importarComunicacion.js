@@ -1,6 +1,5 @@
 import * as XLSX from 'xlsx'
-import { supabase } from './supabaseClient'
-import { fetchAll } from './importer'
+import { fetchAll, upsertInBatches } from './importer'
 
 // Igual que isoDate en importer.js: si la fecha viene como texto
 // "26/08/2026" (dia/mes/año) en vez de fecha real, new Date() de JS no lo
@@ -103,12 +102,17 @@ export async function importarComunicacionAlmacen(file) {
     }
   }
 
-  for (const m of marcadas) {
-    const { error } = await supabase.from('programacion_oc')
-      .update({ fecha_comunicada_almacen: m.fechaAlmacen })
-      .eq('id_entrega', m.id_entrega)
-    if (error) throw error
-  }
+  // En lotes, no fila por fila: con cientos de coincidencias, actualizar
+  // una por una tardaba minutos por la ida y vuelta de cada pedido. "oc" y
+  // "sku" van igual aunque no cambien: Postgres exige las columnas NOT
+  // NULL presentes al armar la fila del upsert.
+  const actualizaciones = marcadas.map(m => ({
+    id_entrega: m.id_entrega,
+    oc: m.oc,
+    sku: m.sku,
+    fecha_comunicada_almacen: m.fechaAlmacen,
+  }))
+  await upsertInBatches('programacion_oc', actualizaciones, 'id_entrega')
 
   return { marcadas, sinEncontrar, ambiguas }
 }
