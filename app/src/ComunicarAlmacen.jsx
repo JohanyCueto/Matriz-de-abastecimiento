@@ -1,11 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { fmt, fdate, nombreMes } from './lib/derive'
+import { exportarCuadroAlmacen, claveMes } from './lib/exportarAlmacen'
+import { importarComunicacionAlmacen } from './lib/importarComunicacion'
 
 export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
   const [seleccion, setSeleccion] = useState(new Set())
   const [guardando, setGuardando] = useState(false)
   const [mes, setMes] = useState('')
+  const [cargandoArchivo, setCargandoArchivo] = useState(false)
+  const [resultadoCarga, setResultadoCarga] = useState(null)
+  const [generando, setGenerando] = useState(false)
+  const inputRef = useRef(null)
 
   // Nunca comunicadas a almacen (fecha_comunicada_almacen vacia): mientras
   // no se marquen aqui, el Cuadro Almacen no las muestra.
@@ -41,6 +47,34 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
     setSeleccion(prev => prev.size === porComunicar.length ? new Set() : new Set(porComunicar.map(r => r.id_entrega)))
   }
 
+  async function generarCuadro() {
+    setGenerando(true)
+    try {
+      await exportarCuadroAlmacen(mes || claveMes(0))
+    } catch (err) {
+      alert('No se pudo generar el cuadro: ' + err.message)
+    } finally {
+      setGenerando(false)
+    }
+  }
+
+  async function cargarArchivo(e) {
+    const file = e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    setCargandoArchivo(true)
+    setResultadoCarga(null)
+    try {
+      const res = await importarComunicacionAlmacen(file)
+      setResultadoCarga(res)
+      onActualizado()
+    } catch (err) {
+      alert('No se pudo leer el archivo: ' + err.message)
+    } finally {
+      setCargandoArchivo(false)
+    }
+  }
+
   async function marcarComunicadas() {
     setGuardando(true)
     try {
@@ -73,6 +107,30 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
           </div>
 
           <div className="mdl-ctrl">
+            <button className="btn" onClick={() => inputRef.current.click()} disabled={cargandoArchivo}>
+              {cargandoArchivo ? 'Leyendo...' : 'Cargar Excel ya enviado a almacen'}
+            </button>
+            <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={cargarArchivo} />
+            <span className="hint" style={{ margin: 0 }}>Para poner al dia de una vez lo que ya le avisaste antes, sin marcar una por una</span>
+          </div>
+
+          {resultadoCarga && (
+            <div className="lock" style={{ marginBottom: 14 }}>
+              <div className="lockt">{resultadoCarga.marcadas.length} entregas puestas al dia desde el archivo</div>
+              {resultadoCarga.sinEncontrar.length > 0 && (
+                <div className="lockd" style={{ marginTop: 8 }}>
+                  {resultadoCarga.sinEncontrar.length} filas del archivo no se encontraron en el sistema (SKU no existe o ya no tiene saldo): {resultadoCarga.sinEncontrar.slice(0, 8).map(f => f.sku).join(', ')}{resultadoCarga.sinEncontrar.length > 8 ? '...' : ''}
+                </div>
+              )}
+              {resultadoCarga.ambiguas.length > 0 && (
+                <div className="lockd" style={{ marginTop: 8 }}>
+                  {resultadoCarga.ambiguas.length} filas coinciden con mas de una entrega (mismo SKU y cantidad repetidos), no se marcaron para no adivinar: {resultadoCarga.ambiguas.slice(0, 8).map(a => a.fila.sku).join(', ')}{resultadoCarga.ambiguas.length > 8 ? '...' : ''}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mdl-ctrl">
             <select value={mes} onChange={e => { setMes(e.target.value); setSeleccion(new Set()) }}>
               <option value="">Todos los meses</option>
               {meses.map(m => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}
@@ -82,6 +140,9 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
             </button>
             <button className="btn act" onClick={marcarComunicadas} disabled={!seleccion.size || guardando}>
               {guardando ? 'Guardando...' : `Marcar ${seleccion.size || ''} como comunicadas`}
+            </button>
+            <button className="btn" onClick={generarCuadro} disabled={!mes || generando} title={!mes ? 'Elige un mes primero' : ''}>
+              {generando ? 'Generando...' : 'Generar Cuadro Almacen'}
             </button>
             <span className="count">{porComunicar.length} sin comunicar</span>
           </div>
