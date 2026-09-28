@@ -18,36 +18,37 @@ function parseMesHeader(v) {
   return `${anio}-${String(mes).padStart(2, '0')}-01`
 }
 
-// Las primeras columnas de la hoja "explosion" (0-based, A=0) son fijas.
-// Las que vienen despues se mueven cada ciclo -- cada mes que pasa,
-// Roxfarma le saca la columna del mes que ya quedo atras (antes
-// Ago-Dic, ahora Set-Dic), y de vez en cuando agrega columnas nuevas
-// (ej. "OC EN TRANSITO", "OC 1"..."OC 4") que corren todo lo que viene
-// despues. Por eso las columnas desde "Cliente" en adelante se ubican por
-// el texto del encabezado, no por una posicion fija.
-const COL = {
-  tipo: 0,
-  codigo: 1,
-  descripcion: 2,
-  disponible: 3,
-  cuarentena: 4,
-  stock: 5,
-}
-
+// Ninguna columna de la hoja "explosion" tiene una posicion fija: cada
+// ciclo Roxfarma puede insertar, sacar o mover columnas (ya paso con el
+// bloque de meses, con "OC EN TRANSITO"/"OC 1".."OC 4", y una vez hasta
+// con una columna en blanco al principio que corrio todo un lugar a la
+// derecha -- ese corrimiento hizo que "tipo" dejara de ser la columna A y
+// el filtro por tipo "ME" no encontrara ninguna fila, sin lanzar ningun
+// error). Por eso todo se ubica por el texto del encabezado, nunca por
+// indice fijo.
 const normalizarHeader = v => String(v || '').trim().toLowerCase()
 
-// Ubica por texto las columnas que se mueven de ciclo en ciclo, y cuenta
-// cuantos meses trae de verdad el bloque de consumo en firme (antes eran
-// siempre 5, ahora pueden ser menos) en vez de asumir un numero fijo.
-function detectarColumnasVariables(header) {
-  const unidadIdx = header.findIndex(h => normalizarHeader(h) === 'unidad')
-  if (unidadIdx === -1) {
-    throw new Error('No se encontró la columna "unidad" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.')
+function columnaObligatoria(header, nombreBuscado, nombreParaError) {
+  const i = header.findIndex(h => normalizarHeader(h) === nombreBuscado)
+  if (i === -1) {
+    throw new Error(`No se encontró la columna "${nombreParaError}" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.`)
   }
-  const clienteIdx = header.findIndex(h => normalizarHeader(h) === 'cliente')
-  if (clienteIdx === -1) {
-    throw new Error('No se encontró la columna "Cliente" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.')
-  }
+  return i
+}
+
+// Ubica por texto todas las columnas de la hoja "explosion" que hacen
+// falta, y cuenta cuantos meses trae de verdad el bloque de consumo en
+// firme (antes eran siempre 5, ahora pueden ser menos) en vez de asumir
+// un numero fijo.
+function detectarColumnas(header) {
+  const tipo = columnaObligatoria(header, 'tipo', 'tipo')
+  const codigo = columnaObligatoria(header, 'codigo', 'codigo')
+  const descripcion = columnaObligatoria(header, 'descripcion', 'descripcion')
+  const disponible = columnaObligatoria(header, 'disponible', 'disponible')
+  const cuarentena = columnaObligatoria(header, 'cuarentena', 'cuarentena')
+  const stock = columnaObligatoria(header, 'stock', 'stock')
+  const unidadIdx = columnaObligatoria(header, 'unidad', 'unidad')
+  const clienteIdx = columnaObligatoria(header, 'cliente', 'Cliente')
   const grupo = header.findIndex(h => /^grupos?$/.test(normalizarHeader(h)))
   if (grupo === -1) {
     throw new Error('No se encontró la columna "Grupos" en la hoja "explosion". Puede que la plantilla haya cambiado de columnas.')
@@ -64,13 +65,19 @@ function detectarColumnasVariables(header) {
   const versionCols = []
   header.forEach((h, i) => { if (normalizarHeader(h).startsWith('version')) versionCols.push(i) })
 
-  return { proyectadoInicio, cliente: clienteIdx, firmeInicio, mesesCount, version1: versionCols[0], version2: versionCols[1], version3: versionCols[2], grupo }
+  return {
+    tipo, codigo, descripcion, disponible, cuarentena, stock,
+    proyectadoInicio, cliente: clienteIdx, firmeInicio, mesesCount,
+    version1: versionCols[0], version2: versionCols[1], version3: versionCols[2], grupo,
+  }
 }
 
-// Posiciones en la hoja "explosion_detallada." (ojo el punto final en el
-// nombre). Solo se usan para calcular el mes de fabricacion mas proximo
-// por material -- no se guardan las ~11,200 filas crudas.
-const DETALLE_COL = { codigo: 0, fechaFabricacion: 10 }
+// Igual que en "explosion": ubicado por texto, no por posicion.
+function detectarColumnasDetalle(header) {
+  const codigo = columnaObligatoria(header, 'cod.material', 'Cod.Material')
+  const fechaFabricacion = columnaObligatoria(header, 'fecha fabricacion', 'Fecha Fabricacion')
+  return { codigo, fechaFabricacion }
+}
 
 // El nombre del archivo trae la fecha de corte real (ej.
 // "Explosion_Analisis__2026.08.27.xlsx"). Se usa para ordenar "anterior
@@ -136,10 +143,10 @@ export async function importarExplosion(file, rol, onStep) {
   const header = rows[0] || []
   const dataRows = rows.slice(1)
 
-  const V = detectarColumnasVariables(header)
+  const C = detectarColumnas(header)
   const mesFechas = []
-  for (let i = 0; i < V.mesesCount; i++) {
-    mesFechas.push(parseMesHeader(header[V.firmeInicio + i]))
+  for (let i = 0; i < C.mesesCount; i++) {
+    mesFechas.push(parseMesHeader(header[C.firmeInicio + i]))
   }
 
   onStep?.('Buscando el mes de fabricación...')
@@ -150,10 +157,11 @@ export async function importarExplosion(file, rol, onStep) {
   const shDet = wb.Sheets['explosion_detallada.']
   if (shDet) {
     const detRows = XLSX.utils.sheet_to_json(shDet, { header: 1, defval: null })
+    const D = detectarColumnasDetalle(detRows[0] || [])
     for (const row of detRows.slice(1)) {
       if (!row) continue
-      const codigo = cleanText(row[DETALLE_COL.codigo])
-      const fecha = toDateOnly(row[DETALLE_COL.fechaFabricacion])
+      const codigo = cleanText(row[D.codigo])
+      const fecha = toDateOnly(row[D.fechaFabricacion])
       if (!codigo || !fecha) continue
       const actual = fabricacionPorCodigo.get(codigo)
       if (!actual || fecha < actual) fabricacionPorCodigo.set(codigo, fecha)
@@ -163,33 +171,42 @@ export async function importarExplosion(file, rol, onStep) {
   onStep?.('Preparando los materiales...')
   const materiales = []
   for (const row of dataRows) {
-    if (!row || row[COL.tipo] !== 'ME') continue
-    const codigo = cleanText(row[COL.codigo])
+    if (!row || row[C.tipo] !== 'ME') continue
+    const codigo = cleanText(row[C.codigo])
     if (!codigo) continue
     const fechaFabricacion = fabricacionPorCodigo.get(codigo)
     const mesFabricacionProximo = fechaFabricacion ? primerDiaMes(fechaFabricacion) : null
     const base = {
       codigo,
-      descripcion: cleanText(row[COL.descripcion]),
-      cliente: cleanText(row[V.cliente]),
-      grupo: row[V.grupo] != null ? (parseInt(row[V.grupo], 10) || null) : null,
-      stock: toNum(row[COL.stock]),
-      disponible: toNum(row[COL.disponible]),
-      cuarentena: toNum(row[COL.cuarentena]),
-      version1: cleanText(row[V.version1]),
-      version2: cleanText(row[V.version2]),
-      version3: cleanText(row[V.version3]),
+      descripcion: cleanText(row[C.descripcion]),
+      cliente: cleanText(row[C.cliente]),
+      grupo: row[C.grupo] != null ? (parseInt(row[C.grupo], 10) || null) : null,
+      stock: toNum(row[C.stock]),
+      disponible: toNum(row[C.disponible]),
+      cuarentena: toNum(row[C.cuarentena]),
+      version1: cleanText(row[C.version1]),
+      version2: cleanText(row[C.version2]),
+      version3: cleanText(row[C.version3]),
       mes_fabricacion_proximo: mesFabricacionProximo ? fechaStr(mesFabricacionProximo) : null,
       fecha_requerida_ingreso: mesFabricacionProximo ? fechaStr(fechaRequeridaDesdeFabricacion(mesFabricacionProximo)) : null,
     }
-    for (let i = 0; i < V.mesesCount; i++) {
+    for (let i = 0; i < C.mesesCount; i++) {
       materiales.push({
         ...base,
         mes: mesFechas[i],
-        consumo_proyectado: toNum(row[V.proyectadoInicio + i]),
-        consumo_firme: toNum(row[V.firmeInicio + i]),
+        consumo_proyectado: toNum(row[C.proyectadoInicio + i]),
+        consumo_firme: toNum(row[C.firmeInicio + i]),
       })
     }
+  }
+
+  // Si ningun material caeria en la explosion (ej. el filtro por tipo
+  // "ME" no encontro nada porque las columnas se corrieron y "tipo" ya
+  // no dice lo que creiamos que decia), es mejor avisar claro que guardar
+  // un snapshot vacio en silencio -- eso ya paso una vez y la comparacion
+  // salio con 0 materiales sin ningun error.
+  if (materiales.length === 0) {
+    throw new Error('No se encontró ningún material tipo "ME" en la hoja "explosion". Revisa que el archivo sea el correcto -- si es el correcto, puede que la plantilla haya cambiado y haya que ajustar el importador.')
   }
 
   onStep?.('Actualizando el snapshot anterior...')
