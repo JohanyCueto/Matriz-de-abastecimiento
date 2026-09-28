@@ -102,10 +102,31 @@ const primerDiaMes = d => new Date(d.getFullYear(), d.getMonth(), 1)
 // setiembre).
 const fechaRequeridaDesdeFabricacion = mesFabricacion => new Date(mesFabricacion.getFullYear(), mesFabricacion.getMonth() - 1, 10)
 
+// Solo puede haber un snapshot con rol 'anterior' y uno con rol 'actual' a
+// la vez (ver el indice unico en supabase/explosion.sql). "Cargar
+// explosión nueva" hace rotar: lo que hasta ahora era 'actual' pasa a ser
+// el nuevo 'anterior', y el que era 'anterior' antes de eso pierde el rol
+// (se queda en la base como historial, ya no se compara). "Corregir
+// explosión anterior" solo reemplaza el 'anterior', sin tocar el 'actual'
+// -- para cuando Johany subio mal un archivo y necesita arreglarlo sin
+// perder la comparacion en curso.
+async function fijarRol(rol) {
+  if (rol === 'actual') {
+    const { error: errLimpiar } = await supabase.from('explosion_snapshots').update({ rol: null }).eq('rol', 'anterior')
+    if (errLimpiar) throw errLimpiar
+    const { error: errAscender } = await supabase.from('explosion_snapshots').update({ rol: 'anterior' }).eq('rol', 'actual')
+    if (errAscender) throw errAscender
+  } else {
+    const { error } = await supabase.from('explosion_snapshots').update({ rol: null }).eq('rol', 'anterior')
+    if (error) throw error
+  }
+}
+
 // Lee la hoja "explosion" del archivo que Johany sube periodicamente,
 // guarda un snapshot nuevo con solo los materiales ME (uno por mes), para
-// poder compararlo despues contra el snapshot anterior.
-export async function importarExplosion(file, onStep) {
+// poder compararlo despues contra el snapshot anterior. rol es 'actual'
+// (Cargar explosión nueva) o 'anterior' (Corregir explosión anterior).
+export async function importarExplosion(file, rol, onStep) {
   onStep?.('Leyendo el archivo...')
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, { type: 'array', cellDates: true })
@@ -171,10 +192,13 @@ export async function importarExplosion(file, onStep) {
     }
   }
 
+  onStep?.('Actualizando el snapshot anterior...')
+  await fijarRol(rol)
+
   onStep?.('Guardando el snapshot...')
   const { data: snap, error: errSnap } = await supabase
     .from('explosion_snapshots')
-    .insert({ archivo: file.name, fecha_corte: fechaCorteDesdeNombre(file.name) })
+    .insert({ archivo: file.name, fecha_corte: fechaCorteDesdeNombre(file.name), rol })
     .select('id')
     .single()
   if (errSnap) throw errSnap
@@ -202,23 +226,19 @@ export async function importarExplosion(file, onStep) {
   }
 }
 
-export async function obtenerUltimosSnapshots(n = 2) {
-  // Se trae un colchón de snapshots recientes (por fecha de carga) y se
-  // reordena por fecha_corte (la fecha real del archivo) del lado del
-  // cliente, para que "anterior vs. actual" siga la fecha del archivo y
-  // no el orden en que se subieron.
+// Ya no hay que adivinar el orden por fecha: cada snapshot dice sola si es
+// la 'anterior' o la 'actual' (columna rol), puesta por fijarRol al
+// importar. Como mucho hay un snapshot de cada rol a la vez.
+export async function obtenerSnapshotsActuales() {
   const { data, error } = await supabase
     .from('explosion_snapshots')
-    .select('id,archivo,creado_en,fecha_corte')
-    .order('creado_en', { ascending: false })
-    .limit(Math.max(n, 10))
+    .select('id,archivo,creado_en,fecha_corte,rol')
+    .in('rol', ['anterior', 'actual'])
   if (error) throw error
-  const ordenados = [...data].sort((a, b) => {
-    const fa = a.fecha_corte || a.creado_en
-    const fb = b.fecha_corte || b.creado_en
-    return fb.localeCompare(fa)
-  })
-  return ordenados.slice(0, n)
+  return {
+    actual: data.find(s => s.rol === 'actual') || null,
+    anterior: data.find(s => s.rol === 'anterior') || null,
+  }
 }
 
 export async function obtenerMaterialesDeSnapshot(snapshotId) {
