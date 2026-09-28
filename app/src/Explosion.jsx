@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, fdate } from './lib/derive'
-import { obtenerUltimosSnapshots, obtenerMaterialesDeSnapshot, obtenerOcPorSku, obtenerIngresosPosterioresA } from './lib/explosionImporter'
+import { obtenerSnapshotsActuales, obtenerMaterialesDeSnapshot, obtenerOcPorSku, obtenerIngresosPosterioresA } from './lib/explosionImporter'
 import { compararExplosiones } from './lib/explosionDiff'
 import { calcularCompraSugerida } from './lib/explosionCompra'
 import ExplosionButton from './ExplosionButton'
@@ -17,7 +17,7 @@ const ESTADO_LABEL = { cubierto: 'Cubierto', a_tiempo: 'A tiempo', ajustado: 'Aj
 export default function Explosion() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
-  const [snaps, setSnaps] = useState([])
+  const [snaps, setSnaps] = useState({ actual: null, anterior: null })
   const [filas, setFilas] = useState(null)
   const [expandido, setExpandido] = useState(null)
 
@@ -36,10 +36,9 @@ export default function Explosion() {
     setLoading(true)
     setErr(null)
     try {
-      const ultimos = await obtenerUltimosSnapshots(2)
-      setSnaps(ultimos)
-      if (ultimos.length === 2) {
-        const [actual, anterior] = ultimos
+      const { actual, anterior } = await obtenerSnapshotsActuales()
+      setSnaps({ actual, anterior })
+      if (actual && anterior) {
         const [matActual, matAnterior] = await Promise.all([
           obtenerMaterialesDeSnapshot(actual.id),
           obtenerMaterialesDeSnapshot(anterior.id),
@@ -114,11 +113,12 @@ export default function Explosion() {
   return (
     <div>
       <div className="bar">
-        <ExplosionButton onDone={cargar} />
-        {snaps.length > 0 && (
+        <ExplosionButton rol="actual" label="Cargar explosión nueva" onDone={cargar} />
+        <ExplosionButton rol="anterior" label="Corregir explosión anterior" className="btn-subtle" onDone={cargar} />
+        {snaps.actual && (
           <span className="pct">
-            Último snapshot: {snaps[0].archivo} ({fechaHora(snaps[0].creado_en)})
-            {snaps.length === 2 && <> — comparado contra {snaps[1].archivo} ({fechaHora(snaps[1].creado_en)})</>}
+            Último snapshot: {snaps.actual.archivo} ({fechaHora(snaps.actual.creado_en)})
+            {snaps.anterior && <> — comparado contra {snaps.anterior.archivo} ({fechaHora(snaps.anterior.creado_en)})</>}
           </span>
         )}
       </div>
@@ -126,11 +126,11 @@ export default function Explosion() {
       {err && <div className="empty">No se pudo cargar la comparación: {err}</div>}
       {loading && <div className="empty">Cargando...</div>}
 
-      {!loading && !err && snaps.length === 0 && (
-        <div className="empty">Todavía no hay ninguna explosión cargada. Usa "Cargar Explosión" para subir la primera.</div>
+      {!loading && !err && !snaps.actual && (
+        <div className="empty">Todavía no hay ninguna explosión cargada. Usa "Cargar explosión nueva" para subir la primera.</div>
       )}
-      {!loading && !err && snaps.length === 1 && (
-        <div className="empty">Ya tienes un snapshot cargado ({snaps[0].archivo}). La próxima vez que cargues una explosión nueva vas a ver aquí qué cambió entre las dos.</div>
+      {!loading && !err && snaps.actual && !snaps.anterior && (
+        <div className="empty">Ya tienes un snapshot cargado ({snaps.actual.archivo}). La próxima vez que uses "Cargar explosión nueva" vas a ver aquí qué cambió entre las dos.</div>
       )}
 
       {!loading && !err && filas && (

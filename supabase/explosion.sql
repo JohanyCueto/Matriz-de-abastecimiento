@@ -47,6 +47,18 @@ create table if not exists explosion_materiales (
 create index if not exists idx_explosion_materiales_snapshot on explosion_materiales (snapshot_id);
 create index if not exists idx_explosion_materiales_codigo on explosion_materiales (codigo, mes);
 
+-- Antes se adivinaba cual snapshot era "anterior" y cual "actual" por la
+-- fecha en el nombre del archivo (fragil: si Johany sube un archivo con
+-- otro nombre, o vuelve a subir uno viejo, se puede invertir el orden o
+-- comparar contra el snapshot equivocado). Ahora ella misma lo dice al
+-- subir: "Cargar explosión nueva" (pasa lo que era 'actual' a 'anterior' y
+-- guarda el nuevo como 'actual') o "Corregir explosión anterior" (solo
+-- reemplaza el 'anterior', sin tocar el 'actual'). Solo puede haber un
+-- snapshot con cada rol a la vez; el resto de snapshots viejos se quedan
+-- en la base sin rol, como historial.
+alter table explosion_snapshots add column if not exists rol text check (rol in ('anterior', 'actual'));
+create unique index if not exists idx_explosion_snapshots_rol_unico on explosion_snapshots (rol) where rol is not null;
+
 alter table explosion_snapshots enable row level security;
 alter table explosion_materiales enable row level security;
 
@@ -54,6 +66,9 @@ create policy "usuarios logueados leen explosion_snapshots" on explosion_snapsho
   for select using (auth.uid() is not null);
 create policy "editores registran explosion_snapshots" on explosion_snapshots
   for insert with check (exists (select 1 from perfiles where id = auth.uid() and rol = 'editor'));
+create policy "editores actualizan explosion_snapshots" on explosion_snapshots
+  for update using (exists (select 1 from perfiles where id = auth.uid() and rol = 'editor'))
+  with check (exists (select 1 from perfiles where id = auth.uid() and rol = 'editor'));
 
 create policy "usuarios logueados leen explosion_materiales" on explosion_materiales
   for select using (auth.uid() is not null);

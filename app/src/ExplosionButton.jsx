@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { importarExplosion } from './lib/explosionImporter'
 
-export default function ExplosionButton({ onDone }) {
+export default function ExplosionButton({ rol, label, className, onDone }) {
   const inputRef = useRef(null)
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -13,7 +13,7 @@ export default function ExplosionButton({ onDone }) {
     setBusy(true)
     setStatus('Empezando...')
     try {
-      const r = await importarExplosion(file, setStatus)
+      const r = await importarExplosion(file, rol, setStatus)
       setStatus(`Listo: ${r.materiales} materiales guardados.`)
       onDone()
     } catch (err) {
@@ -26,8 +26,8 @@ export default function ExplosionButton({ onDone }) {
 
   return (
     <div className="imp">
-      <button className="btn" disabled={busy} onClick={() => inputRef.current.click()}>
-        {busy ? 'Cargando...' : 'Cargar Explosión'}
+      <button className={className || 'btn'} disabled={busy} onClick={() => inputRef.current.click()}>
+        {busy ? 'Cargando...' : label}
       </button>
       <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
       {status && <span className="impst">{status}</span>}
