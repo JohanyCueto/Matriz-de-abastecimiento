@@ -3,7 +3,7 @@ import { fmt } from './lib/derive'
 import {
   cargarContactos, guardarContacto, cargarHistorial, registrarEnvio,
   generarAsunto, generarEmailHtml, enviarRecordatorio,
-  claveMes, nombreCorto,
+  nombreCorto,
 } from './lib/recordatorioService'
 
 function hace(iso) {
@@ -20,7 +20,7 @@ function hace(iso) {
 export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
   const [contactos, setContactos] = useState([])
   const [historial, setHistorial] = useState([])
-  const [rango, setRango] = useState('este')
+  const [rango, setRango] = useState('todas')
   const [buscar, setBuscar] = useState('')
   const [editEmail, setEditEmail] = useState({})
   const [vistaPrevia, setVistaPrevia] = useState(null)
@@ -29,9 +29,6 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
   const [cargando, setCargando] = useState(true)
   const [aprobados, setAprobados] = useState({})
   const [confirmar, setConfirmar] = useState(false)
-
-  const claveEste = claveMes(0)
-  const claveProx = claveMes(1)
 
   useEffect(() => {
     Promise.all([
@@ -44,12 +41,19 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
     })
   }, [])
 
+  const mesesDisponibles = useMemo(() => {
+    const set = new Set()
+    for (const r of rows) {
+      if (r.abierto && r.fecha_programada_ingreso) set.add(r.fecha_programada_ingreso.slice(0, 7))
+    }
+    return [...set].sort()
+  }, [rows])
+
   const porProveedor = useMemo(() => {
     const abiertas = rows.filter(r => r.abierto).filter(r => {
+      if (rango === 'todas') return true
       const clave = r.fecha_programada_ingreso?.slice(0, 7)
-      if (rango === 'este') return clave === claveEste
-      if (rango === 'proximo') return clave === claveProx
-      return clave === claveEste || clave === claveProx
+      return clave === rango
     })
 
     const groups = new Map()
@@ -69,7 +73,7 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
         return { nombre, filas, contacto, atrasadas, ultimoEnvio }
       })
       .sort((a, b) => b.atrasadas - a.atrasadas || b.filas.length - a.filas.length)
-  }, [rows, contactos, historial, rango, buscar, claveEste, claveProx])
+  }, [rows, contactos, historial, rango, buscar])
 
   const conCorreo = porProveedor.filter(p => p.contacto?.correo)
 
@@ -239,9 +243,10 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
         <div className="mdl-b">
           <div className="mdl-ctrl">
             <select value={rango} onChange={e => setRango(e.target.value)}>
-              <option value="este">Pendientes de {nombreCorto(claveEste)}</option>
-              <option value="proximo">Pendientes de {nombreCorto(claveProx)}</option>
-              <option value="ambos">Ambos meses</option>
+              <option value="todas">Todas las pendientes</option>
+              {mesesDisponibles.map(m => (
+                <option key={m} value={m}>{nombreCorto(m)}</option>
+              ))}
             </select>
             <input
               type="text"
