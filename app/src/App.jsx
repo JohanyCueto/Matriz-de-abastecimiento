@@ -5,13 +5,11 @@ import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } fr
 import { ultimasImportaciones, hace } from './lib/importaciones'
 import { fetchAll } from './lib/importer'
 import Panel from './Panel'
-import Recordatorio from './Recordatorio'
 import EnviarRecordatorios from './EnviarRecordatorios'
 import ComunicarAlmacen from './ComunicarAlmacen'
 import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
-import ExportAlmacenButton from './ExportAlmacenButton'
 import Explosion from './Explosion'
 import Login from './Login'
 import './App.css'
@@ -45,7 +43,6 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
-  const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
   const [mostrarComunicar, setMostrarComunicar] = useState(false)
   const [mostrarEnviar, setMostrarEnviar] = useState(false)
   const [vista, setVista] = useState('oc')
@@ -290,9 +287,7 @@ export default function App() {
             {esEditor && <ImportButton onDone={cargar} />}
             {esEditor && <ImportIngresosButton onDone={cargar} />}
             <ExportButton />
-            <ExportAlmacenButton />
             {esEditor && <button className="btn" onClick={() => setMostrarComunicar(true)}>Comunicar a almacen</button>}
-            <button className="btn" onClick={() => setMostrarRecordatorio(true)}>Recordatorio proveedor</button>
             {esEditor && <button className="btn" onClick={() => setMostrarEnviar(true)}>Enviar recordatorios</button>}
             <span className="count">{fmt(filtradas.length)} lineas | {fmt(filtradas.filter(r => r.abierto).length)} abiertas</span>
           </div>
@@ -326,10 +321,6 @@ export default function App() {
 
       {selected && (
         <Panel row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
-      )}
-
-      {mostrarRecordatorio && (
-        <Recordatorio rows={rows} proveedores={proveedores} onClose={() => setMostrarRecordatorio(false)} />
       )}
 
       {mostrarComunicar && (
