@@ -27,6 +27,8 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
   const [enviando, setEnviando] = useState(null)
   const [resultado, setResultado] = useState({})
   const [cargando, setCargando] = useState(true)
+  const [aprobados, setAprobados] = useState({})
+  const [confirmar, setConfirmar] = useState(false)
 
   const claveEste = claveMes(0)
   const claveProx = claveMes(1)
@@ -70,7 +72,22 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
   }, [rows, contactos, historial, rango, buscar, claveEste, claveProx])
 
   const conCorreo = porProveedor.filter(p => p.contacto?.correo)
-  const sinCorreo = porProveedor.filter(p => !p.contacto?.correo)
+
+  function toggleAprobado(nombre) {
+    setAprobados(prev => ({ ...prev, [nombre]: !prev[nombre] }))
+  }
+
+  function aprobarTodos() {
+    const nuevos = {}
+    conCorreo.forEach(p => { nuevos[p.nombre] = true })
+    setAprobados(nuevos)
+  }
+
+  function desaprobarTodos() {
+    setAprobados({})
+  }
+
+  const aprobadosLista = conCorreo.filter(p => aprobados[p.nombre])
 
   async function guardarEmail(nombre, correo) {
     const existente = contactos.find(c => c.nombre === nombre)
@@ -84,34 +101,30 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
     setEditEmail(prev => { const n = { ...prev }; delete n[nombre]; return n })
   }
 
-  async function enviarUno(prov) {
-    if (!prov.contacto?.correo) return
-    setEnviando(prov.nombre)
-    setResultado(prev => ({ ...prev, [prov.nombre]: null }))
-    const html = generarEmailHtml(prov.nombre, prov.filas)
-    const asunto = generarAsunto(prov.nombre, prov.filas)
-    try {
-      await enviarRecordatorio(
-        prov.contacto.correo,
-        prov.contacto.correo_cc || null,
-        asunto,
-        html,
-      )
-      await registrarEnvio(prov.nombre, prov.contacto.correo, prov.filas.length)
-      setResultado(prev => ({ ...prev, [prov.nombre]: 'ok' }))
-      const h = await cargarHistorial()
-      setHistorial(h)
-    } catch (err) {
-      setResultado(prev => ({ ...prev, [prov.nombre]: err.message }))
-    }
-    setEnviando(null)
-  }
-
-  async function enviarTodos() {
-    for (const prov of conCorreo) {
+  async function enviarAprobados() {
+    setConfirmar(false)
+    for (const prov of aprobadosLista) {
       if (resultado[prov.nombre] === 'ok') continue
-      await enviarUno(prov)
+      setEnviando(prov.nombre)
+      setResultado(prev => ({ ...prev, [prov.nombre]: null }))
+      const html = generarEmailHtml(prov.nombre, prov.filas)
+      const asunto = generarAsunto(prov.nombre, prov.filas)
+      try {
+        await enviarRecordatorio(
+          prov.contacto.correo,
+          prov.contacto.correo_cc || null,
+          asunto,
+          html,
+        )
+        await registrarEnvio(prov.nombre, prov.contacto.correo, prov.filas.length)
+        setResultado(prev => ({ ...prev, [prov.nombre]: 'ok' }))
+      } catch (err) {
+        setResultado(prev => ({ ...prev, [prov.nombre]: err.message }))
+      }
+      setEnviando(null)
     }
+    const h = await cargarHistorial().catch(() => [])
+    setHistorial(h)
   }
 
   async function copiarEmail(prov) {
@@ -129,6 +142,41 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
     }
   }
 
+  // --- Pantalla de confirmacion ---
+  if (confirmar) {
+    return (
+      <div className="mdl-ov" onClick={() => setConfirmar(false)}>
+        <div className="mdl" onClick={e => e.stopPropagation()}>
+          <div className="mdl-h">
+            <h2>Confirmar envio</h2>
+            <button className="btn" onClick={() => setConfirmar(false)}>Cancelar</button>
+          </div>
+          <div className="mdl-b">
+            <div className="conf-aviso">
+              Vas a enviar <b>{aprobadosLista.length}</b> correo{aprobadosLista.length > 1 ? 's' : ''} de recordatorio a:
+            </div>
+            <div className="conf-lista">
+              {aprobadosLista.map(p => (
+                <div key={p.nombre} className="conf-fila">
+                  <b>{p.nombre}</b>
+                  <span className="dim">{p.contacto.correo}</span>
+                  <span>{p.filas.length} entrega{p.filas.length > 1 ? 's' : ''}</span>
+                </div>
+              ))}
+            </div>
+            <div className="conf-btns">
+              <button className="btn" onClick={() => setConfirmar(false)}>Cancelar</button>
+              <button className="btn act" onClick={enviarAprobados}>
+                Si, enviar {aprobadosLista.length} correo{aprobadosLista.length > 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- Vista previa de un correo ---
   if (vistaPrevia) {
     const prov = porProveedor.find(p => p.nombre === vistaPrevia)
     if (!prov) { setVistaPrevia(null); return null }
@@ -138,7 +186,7 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
       <div className="mdl-ov" onClick={() => setVistaPrevia(null)}>
         <div className="mdl mdl-wide" onClick={e => e.stopPropagation()}>
           <div className="mdl-h">
-            <h2>Vista previa del correo</h2>
+            <h2>Revisar correo — {prov.nombre}</h2>
             <button className="btn" onClick={() => setVistaPrevia(null)}>Volver</button>
           </div>
           <div className="mdl-b">
@@ -146,37 +194,41 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
               <span><b>Para:</b> {prov.contacto?.correo || '(sin correo)'}</span>
               {prov.contacto?.correo_cc && <span><b>CC:</b> {prov.contacto.correo_cc}</span>}
               <span><b>Asunto:</b> {asunto}</span>
+              <span><b>Entregas:</b> {prov.filas.length} pendiente{prov.filas.length > 1 ? 's' : ''}{prov.atrasadas > 0 ? `, ${prov.atrasadas} atrasada${prov.atrasadas > 1 ? 's' : ''}` : ''}</span>
             </div>
             <div className="prev-frame">
               <iframe
                 title="Vista previa"
                 srcDoc={html}
-                style={{ width: '100%', height: '500px', border: '1px solid var(--brd)', borderRadius: 6, background: '#fff' }}
+                style={{ width: '100%', height: '500px', border: '1px solid var(--line)', borderRadius: 6, background: '#fff' }}
               />
             </div>
             <div className="prev-acts">
               <button className="btn act" onClick={() => copiarEmail(prov)}>
-                {resultado[prov.nombre] === 'copiado' ? 'Copiado' : 'Copiar correo'}
+                {resultado[prov.nombre] === 'copiado' ? 'Copiado' : 'Copiar para pegar en Outlook'}
               </button>
               {prov.contacto?.correo && esEditor && (
-                <button
-                  className="btn act"
-                  disabled={enviando === prov.nombre || resultado[prov.nombre] === 'ok'}
-                  onClick={() => enviarUno(prov)}
-                >
-                  {enviando === prov.nombre ? 'Enviando...' : resultado[prov.nombre] === 'ok' ? 'Enviado' : 'Enviar correo'}
-                </button>
-              )}
-              {resultado[prov.nombre] && resultado[prov.nombre] !== 'ok' && resultado[prov.nombre] !== 'copiado' && (
-                <span className="rec-err">{resultado[prov.nombre]}</span>
+                <label className="rec-check" style={{ marginLeft: 'auto' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!aprobados[prov.nombre]}
+                    onChange={() => toggleAprobado(prov.nombre)}
+                  />
+                  Aprobar para envio
+                </label>
               )}
             </div>
+            {resultado[prov.nombre] === 'ok' && <div className="rec-ok">Enviado correctamente</div>}
+            {resultado[prov.nombre] && resultado[prov.nombre] !== 'ok' && resultado[prov.nombre] !== 'copiado' && (
+              <div className="rec-err">{resultado[prov.nombre]}</div>
+            )}
           </div>
         </div>
       </div>
     )
   }
 
+  // --- Lista principal ---
   return (
     <div className="mdl-ov" onClick={onClose}>
       <div className="mdl mdl-wide" onClick={e => e.stopPropagation()}>
@@ -198,15 +250,6 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
               onChange={e => setBuscar(e.target.value)}
               style={{ flex: 1, minWidth: 160 }}
             />
-            {esEditor && conCorreo.length > 0 && (
-              <button
-                className="btn act"
-                disabled={!!enviando}
-                onClick={enviarTodos}
-              >
-                {enviando ? 'Enviando...' : `Enviar a todos (${conCorreo.length})`}
-              </button>
-            )}
           </div>
 
           {cargando ? <div className="mdl-empty">Cargando contactos...</div> : (
@@ -214,8 +257,11 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
               <div className="rec-resumen">
                 <span>{fmt(porProveedor.length)} proveedores con entregas pendientes</span>
                 <span className="dim">
-                  {conCorreo.length} con correo, {sinCorreo.length} sin correo
+                  {conCorreo.length} con correo, {porProveedor.length - conCorreo.length} sin correo
                 </span>
+                {aprobadosLista.length > 0 && (
+                  <span className="rec-aprobados-cnt">{aprobadosLista.length} aprobado{aprobadosLista.length > 1 ? 's' : ''} para envio</span>
+                )}
               </div>
 
               <div className="rec-lista">
@@ -223,29 +269,33 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
                   <div className="mdl-empty">No hay proveedores con entregas pendientes en este periodo.</div>
                 )}
                 {porProveedor.map(prov => (
-                  <div key={prov.nombre} className={`rec-prov ${prov.atrasadas > 0 ? 'rec-prov-atraso' : ''}`}>
+                  <div key={prov.nombre} className={`rec-prov ${prov.atrasadas > 0 ? 'rec-prov-atraso' : ''} ${aprobados[prov.nombre] ? 'rec-prov-ok' : ''} ${resultado[prov.nombre] === 'ok' ? 'rec-prov-sent' : ''}`}>
                     <div className="rec-prov-head">
                       <div className="rec-prov-nombre">
-                        <b>{prov.nombre}</b>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {prov.contacto?.correo && esEditor && (
+                            <input
+                              type="checkbox"
+                              checked={!!aprobados[prov.nombre]}
+                              onChange={() => toggleAprobado(prov.nombre)}
+                              disabled={resultado[prov.nombre] === 'ok'}
+                              title="Aprobar para envio"
+                            />
+                          )}
+                          <b>{prov.nombre}</b>
+                          {resultado[prov.nombre] === 'ok' && <span className="rec-tag-ok">Enviado</span>}
+                          {aprobados[prov.nombre] && resultado[prov.nombre] !== 'ok' && <span className="rec-tag-aprob">Aprobado</span>}
+                        </div>
                         <span className="rec-prov-cnt">
                           {prov.filas.length} entrega{prov.filas.length > 1 ? 's' : ''}
                           {prov.atrasadas > 0 && <span className="rec-atraso">{prov.atrasadas} atrasada{prov.atrasadas > 1 ? 's' : ''}</span>}
                         </span>
                       </div>
                       <div className="rec-prov-acciones">
-                        <button className="btn-sm" onClick={() => setVistaPrevia(prov.nombre)}>Vista previa</button>
+                        <button className="btn-sm" onClick={() => setVistaPrevia(prov.nombre)}>Revisar correo</button>
                         <button className="btn-sm" onClick={() => copiarEmail(prov)}>
                           {resultado[prov.nombre] === 'copiado' ? 'Copiado' : 'Copiar'}
                         </button>
-                        {prov.contacto?.correo && esEditor && (
-                          <button
-                            className="btn-sm act"
-                            disabled={enviando === prov.nombre || resultado[prov.nombre] === 'ok'}
-                            onClick={() => enviarUno(prov)}
-                          >
-                            {enviando === prov.nombre ? '...' : resultado[prov.nombre] === 'ok' ? 'Enviado' : 'Enviar'}
-                          </button>
-                        )}
                       </div>
                     </div>
                     <div className="rec-prov-email">
@@ -278,11 +328,33 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
                         <span className="rec-ultimo">Ultimo envio: {hace(prov.ultimoEnvio.enviado_en)}</span>
                       )}
                     </div>
+                    {enviando === prov.nombre && <div className="rec-enviando">Enviando...</div>}
                     {resultado[prov.nombre] && resultado[prov.nombre] !== 'ok' && resultado[prov.nombre] !== 'copiado' && (
                       <div className="rec-err">{resultado[prov.nombre]}</div>
                     )}
                   </div>
                 ))}
+              </div>
+
+              <div className="rec-footer">
+                <div className="rec-footer-left">
+                  {esEditor && conCorreo.length > 0 && (
+                    <>
+                      <button className="btn-sm" onClick={aprobadosLista.length === conCorreo.length ? desaprobarTodos : aprobarTodos}>
+                        {aprobadosLista.length === conCorreo.length ? 'Desmarcar todos' : 'Aprobar todos'}
+                      </button>
+                    </>
+                  )}
+                </div>
+                {esEditor && aprobadosLista.length > 0 && (
+                  <button
+                    className="btn act"
+                    disabled={!!enviando}
+                    onClick={() => setConfirmar(true)}
+                  >
+                    {enviando ? 'Enviando...' : `Enviar ${aprobadosLista.length} correo${aprobadosLista.length > 1 ? 's' : ''} aprobado${aprobadosLista.length > 1 ? 's' : ''}`}
+                  </button>
+                )}
               </div>
 
               {historial.length > 0 && (
@@ -301,7 +373,7 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
           )}
 
           <div className="hint" style={{ marginTop: 12 }}>
-            Puedes copiar el correo y pegarlo en Outlook/Gmail, o enviarlo directo desde aqui si tienes Resend configurado.
+            Revisa cada correo con "Revisar correo", marca los que apruebes, y dale "Enviar aprobados". Tambien puedes copiar y pegar directo en Outlook.
           </div>
         </div>
       </div>

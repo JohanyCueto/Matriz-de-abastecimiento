@@ -221,3 +221,20 @@ tbody tr.sel{background:#f2f5f9}
 .prev-info{display:flex;flex-direction:column;gap:4px;font-size:12.5px;margin-bottom:12px;padding:10px 14px;background:var(--bg);border-radius:8px}
 .prev-frame{margin-bottom:12px}
 .prev-acts{display:flex;gap:10px;align-items:center}
+
+.rec-check{display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.rec-tag-ok{display:inline-block;font-size:11px;background:var(--grnbg);color:var(--grn);padding:2px 8px;border-radius:10px;font-weight:600}
+.rec-tag-aprob{display:inline-block;font-size:11px;background:var(--blubg);color:var(--blu);padding:2px 8px;border-radius:10px;font-weight:600}
+.rec-ok{color:var(--grn);font-size:12px;margin-top:6px;font-weight:500}
+.rec-enviando{color:var(--blu);font-size:12px;margin-top:4px}
+.rec-prov-ok{border-color:var(--blu);background:#f8faff}
+.rec-prov-sent{border-color:var(--grn);background:var(--grnbg);opacity:.8}
+.rec-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.rec-footer-left{display:flex;gap:8px;align-items:center}
+.rec-aprobados-cnt{color:var(--blu);font-weight:600}
+
+.conf-aviso{font-size:14px;margin-bottom:14px;line-height:1.6}
+.conf-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;margin-bottom:18px}
+.conf-fila{display:flex;gap:12px;align-items:center;font-size:13px;padding:8px 12px;background:var(--bg);border-radius:8px}
+.conf-fila b{flex:1}
+.conf-btns{display:flex;gap:10px;justify-content:flex-end}
