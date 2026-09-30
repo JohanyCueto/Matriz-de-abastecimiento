@@ -185,7 +185,7 @@ export async function importarExcel(file, onStep) {
 
   onStep?.('Revisando lo que ya tienes guardado...')
   const existentesProg = await fetchAll('programacion_oc',
-    'id_entrega,fecha_programada_ingreso,estado_gestion,motivo_demora,responsable_accion,criticidad,observaciones,cierre_manual,motivo_cierre,reabierta,historial,fecha_confirmada')
+    'id_entrega,fecha_programada_ingreso,estado_gestion,motivo_demora,responsable_accion,criticidad,observaciones,cierre_manual,motivo_cierre,reabierta,historial,fecha_confirmada,ajuste_cantidad,motivo_ajuste')
   const existentesPorId = new Map(existentesProg.map(r => [r.id_entrega, r]))
 
   const existentesIng = await fetchAll('ingresos_sistema', 'numero_analisis,oc,codigo,cantidad_ingresada,fecha_ingreso')
@@ -237,6 +237,8 @@ export async function importarExcel(file, onStep) {
       reabierta: prev ? prev.reabierta : false,
       historial: prev ? prev.historial : [],
       fecha_confirmada: prev ? prev.fecha_confirmada : null,
+      ajuste_cantidad: prev ? (prev.ajuste_cantidad || 0) : 0,
+      motivo_ajuste: prev ? prev.motivo_ajuste : null,
     }
   }).filter(e => e.id_entrega && e.sku)
 

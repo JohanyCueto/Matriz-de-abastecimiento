@@ -62,18 +62,14 @@ export function withEntregas(rows) {
 // Le agrega a una fila los campos que se calculan en el navegador (no se
 // guardan en la base, dependen de la fecha de hoy).
 export function enrich(r) {
-  const saldo = r.saldo_pendiente || 0
+  const ajuste = r.ajuste_cantidad || 0
+  const progEfectivo = (r.cant_programada || 0) + ajuste
+  const saldo = Math.max(0, progEfectivo - (r.cant_ingresada || 0))
   const abierto = saldo > 0 && !CERRADAS.includes(r.estado_gestion)
-  // "Cerrada con saldo" (tol, en el sentido amplio) pasa siempre por una
-  // decision manual de Johany. Dentro del margen de tolerancia se acepta
-  // como cierre normal (verde); mas alla del margen sigue siendo un cierre
-  // manual suyo, pero se distingue para que revise si le afecta el
-  // abastecimiento (rojo, "fuera de tolerancia").
   const tol = CERRADAS.includes(r.estado_gestion) && saldo > 0
   const dd = days(r.fecha_programada_ingreso)
-  const prog = r.cant_programada || 0
-  const avance = prog ? Math.min(1, (r.cant_ingresada || 0) / prog) : 0
-  const desv = prog ? ((r.cant_ingresada || 0) - prog) / prog : 0
+  const avance = progEfectivo ? Math.min(1, (r.cant_ingresada || 0) / progEfectivo) : 0
+  const desv = progEfectivo ? ((r.cant_ingresada || 0) - progEfectivo) / progEfectivo : 0
   const dentroTolerancia = tol && Math.abs(desv) <= TOLERANCIA_MARGEN
   const fueraTolerancia = tol && Math.abs(desv) > TOLERANCIA_MARGEN
   let sem2
@@ -104,5 +100,5 @@ export function enrich(r) {
   // cerraste (aunque sea con tolerancia y le falte un poco), ya no cuenta
   // como pendiente.
   const estadoIngreso = abierto ? 'Pendiente' : 'Completo'
-  return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, estado_confirmacion, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
+  return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, estado_confirmacion, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0, saldo_pendiente: saldo, progEfectivo }
 }

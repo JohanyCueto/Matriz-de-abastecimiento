@@ -10,6 +10,8 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
   const [fec, setFec] = useState(row.fecha_programada_ingreso || '')
   const [fecConf, setFecConf] = useState(row.fecha_confirmada || '')
   const [com, setCom] = useState(row.observaciones || '')
+  const [ajuste, setAjuste] = useState(row.ajuste_cantidad || 0)
+  const [motAjuste, setMotAjuste] = useState(row.motivo_ajuste || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -26,7 +28,7 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
 
   async function guardar() {
     setSaving(true)
-    const patch = { estado_gestion: ges, motivo_demora: mot || null, responsable_accion: resp || null, observaciones: com || null, fecha_confirmada: fecConf || null }
+    const patch = { estado_gestion: ges, motivo_demora: mot || null, responsable_accion: resp || null, observaciones: com || null, fecha_confirmada: fecConf || null, ajuste_cantidad: Number(ajuste) || 0, motivo_ajuste: motAjuste || null }
     if (fec && fec !== row.fecha_programada_ingreso) {
       const hist = [...(row.hist || []), { de: row.fecha_programada_ingreso, a: fec, motivo: patch.motivo_demora, resp: patch.responsable_accion, coment: com }]
       patch.historial = hist
@@ -64,14 +66,15 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
               </div>
             )}
             <div className="bigp"><i style={{ width: `${(row.avance * 100).toFixed(0)}%` }} /></div>
-            <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{fmt(row.cant_ingresada)} de {fmt(row.cant_programada)} recibidos ({(row.avance * 100).toFixed(0)}%)</div>
+            <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{fmt(row.cant_ingresada)} de {fmt(row.progEfectivo)} recibidos ({(row.avance * 100).toFixed(0)}%)</div>
           </div>
 
           <div className="sec">
             <h3>Entrega</h3>
-            <div className="kv"><span>Cantidad programada</span><b>{fmt(row.cant_programada)}</b></div>
+            <div className="kv"><span>Cantidad programada</span><b>{fmt(row.cant_programada)}{row.ajuste_cantidad ? <span style={{ color: 'var(--amb)', fontSize: 12 }}> {row.ajuste_cantidad > 0 ? '+' : ''}{fmt(row.ajuste_cantidad)} ajuste = {fmt(row.progEfectivo)}</span> : ''}</b></div>
             <div className="kv"><span>Cantidad ingresada</span><b>{fmt(row.cant_ingresada)}</b></div>
             <div className="kv"><span>Saldo pendiente</span><b style={{ color: row.saldo_pendiente > 0 ? (row.tol ? 'var(--grn)' : 'var(--red)') : 'var(--ink3)' }}>{fmt(row.saldo_pendiente)}</b></div>
+            {row.ajuste_cantidad !== 0 && row.ajuste_cantidad != null && <div className="kv"><span>Ajuste excepcional</span><b style={{ color: 'var(--amb)' }}>{row.ajuste_cantidad > 0 ? '+' : ''}{fmt(row.ajuste_cantidad)}{row.motivo_ajuste ? ` (${row.motivo_ajuste})` : ''}</b></div>}
             {row.tol && <div className="kv"><span>Cierre dentro de tolerancia</span><b style={{ color: 'var(--grn)' }}>si, {(row.desv * 100).toFixed(1)}% de desviacion</b></div>}
             <div className="kv"><span>Fecha solicitada (programada)</span><b>{fdate(row.fecha_programada_ingreso)}{row.hist.length > 0 && <span className="rep">R{row.hist.length > 1 ? row.hist.length : ''}</span>}</b></div>
             <div className="kv"><span>Fecha confirmada proveedor</span><b>{row.fecha_confirmada ? fdate(row.fecha_confirmada) : <span className="dim">sin confirmar</span>}</b></div>
@@ -178,6 +181,17 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
                   </div>
                   <input type="date" value={fecConf || ''} onChange={e => setFecConf(e.target.value)} />
                   <div className="hint">Si el proveedor confirma otra fecha, ingresala manualmente.</div>
+                </div>
+                <div className="fld">
+                  <label>Ajuste excepcional de cantidad</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input type="number" style={{ width: 100 }} value={ajuste} onChange={e => setAjuste(e.target.value)} />
+                    <span style={{ fontSize: 12, color: 'var(--ink3)' }}>Original: {fmt(row.cant_programada)} → Total: {fmt((row.cant_programada || 0) + (Number(ajuste) || 0))}</span>
+                  </div>
+                  {(Number(ajuste) || 0) !== 0 && (
+                    <input type="text" style={{ marginTop: 6 }} placeholder="Motivo del ajuste (ej. ruptura de stock)" value={motAjuste} onChange={e => setMotAjuste(e.target.value)} />
+                  )}
+                  <div className="hint">Solo para casos excepcionales como ruptura de stock. Positivo para aumentar, negativo para reducir. El campo original del Excel no se modifica.</div>
                 </div>
                 <div className="fld">
                   <label>Comentario</label>
