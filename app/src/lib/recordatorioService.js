@@ -75,7 +75,6 @@ export function generarEmailHtml(proveedor, filas) {
       <td style="border:1px solid #d0d5dd;padding:8px;text-align:center">${r.oc}</td>
       <td style="border:1px solid #d0d5dd;padding:8px">${r.sku}</td>
       <td style="border:1px solid #d0d5dd;padding:8px">${r.descripcion || ''}</td>
-      <td style="border:1px solid #d0d5dd;padding:8px;text-align:right">${fmt(r.progEfectivo || r.cant_programada)}</td>
       <td style="border:1px solid #d0d5dd;padding:8px;text-align:right">${fmt(r.saldo_pendiente)}</td>
       <td style="border:1px solid #d0d5dd;padding:8px;text-align:center">${fdate(r.fecha_programada_ingreso)}</td>
       <td style="border:1px solid #d0d5dd;padding:8px;text-align:center;${esAtraso ? 'color:#dc2626;font-weight:600' : ''}">${diasTexto(r)}</td>
@@ -116,8 +115,7 @@ export function generarEmailHtml(proveedor, filas) {
             <th style="border:1px solid #00167b;padding:8px">OC</th>
             <th style="border:1px solid #00167b;padding:8px">SKU</th>
             <th style="border:1px solid #00167b;padding:8px">Material</th>
-            <th style="border:1px solid #00167b;padding:8px;text-align:right">Programado</th>
-            <th style="border:1px solid #00167b;padding:8px;text-align:right">Pendiente</th>
+            <th style="border:1px solid #00167b;padding:8px;text-align:right">Cantidad pendiente</th>
             <th style="border:1px solid #00167b;padding:8px">F. programada</th>
             <th style="border:1px solid #00167b;padding:8px">Estado</th>
             <th style="border:1px solid #00167b;padding:8px">Gestion</th>
