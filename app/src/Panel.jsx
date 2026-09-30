@@ -8,6 +8,7 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
   const [mot, setMot] = useState(row.motivo_demora || '')
   const [resp, setResp] = useState(row.responsable_accion || '')
   const [fec, setFec] = useState(row.fecha_programada_ingreso || '')
+  const [fecConf, setFecConf] = useState(row.fecha_confirmada || '')
   const [com, setCom] = useState(row.observaciones || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -25,7 +26,7 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
 
   async function guardar() {
     setSaving(true)
-    const patch = { estado_gestion: ges, motivo_demora: mot || null, responsable_accion: resp || null, observaciones: com || null }
+    const patch = { estado_gestion: ges, motivo_demora: mot || null, responsable_accion: resp || null, observaciones: com || null, fecha_confirmada: fecConf || null }
     if (fec && fec !== row.fecha_programada_ingreso) {
       const hist = [...(row.hist || []), { de: row.fecha_programada_ingreso, a: fec, motivo: patch.motivo_demora, resp: patch.responsable_accion, coment: com }]
       patch.historial = hist
@@ -72,7 +73,9 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
             <div className="kv"><span>Cantidad ingresada</span><b>{fmt(row.cant_ingresada)}</b></div>
             <div className="kv"><span>Saldo pendiente</span><b style={{ color: row.saldo_pendiente > 0 ? (row.tol ? 'var(--grn)' : 'var(--red)') : 'var(--ink3)' }}>{fmt(row.saldo_pendiente)}</b></div>
             {row.tol && <div className="kv"><span>Cierre dentro de tolerancia</span><b style={{ color: 'var(--grn)' }}>si, {(row.desv * 100).toFixed(1)}% de desviacion</b></div>}
-            <div className="kv"><span>Fecha programada vigente</span><b>{fdate(row.fecha_programada_ingreso)}{row.hist.length > 0 && <span className="rep">R{row.hist.length > 1 ? row.hist.length : ''}</span>}</b></div>
+            <div className="kv"><span>Fecha solicitada (programada)</span><b>{fdate(row.fecha_programada_ingreso)}{row.hist.length > 0 && <span className="rep">R{row.hist.length > 1 ? row.hist.length : ''}</span>}</b></div>
+            <div className="kv"><span>Fecha confirmada proveedor</span><b>{row.fecha_confirmada ? fdate(row.fecha_confirmada) : <span className="dim">sin confirmar</span>}</b></div>
+            {row.estado_confirmacion && <div className="kv"><span>Estado confirmacion</span><span className={`tag ${row.estado_confirmacion === 'Confirmada' ? 't-grn' : row.estado_confirmacion === 'Pendiente' ? 't-amb' : 't-red'}`}>{row.estado_confirmacion}</span></div>}
             {row.hist.length > 0 && <>
               <div className="kv"><span>Fecha original de la OC</span><b className="dim">{fdate(row.fprog0)}</b></div>
               <div className="kv"><span>Desviacion acumulada</span><b style={{ color: 'var(--amb)' }}>{days(row.fecha_programada_ingreso) - days(row.fprog0)} dias</b></div>
@@ -161,9 +164,14 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
                   </select>
                 </div>
                 <div className="fld">
-                  <label>Nueva fecha comprometida</label>
+                  <label>Nueva fecha solicitada</label>
                   <input type="date" value={fec || ''} onChange={e => setFec(e.target.value)} />
                   <div className="hint">Si cambias esta fecha, la linea se marca como reprogramada y queda el registro de la fecha anterior.</div>
+                </div>
+                <div className="fld">
+                  <label>Fecha confirmada por proveedor</label>
+                  <input type="date" value={fecConf || ''} onChange={e => setFecConf(e.target.value)} />
+                  <div className="hint">La fecha que el proveedor confirma para esta entrega. Si difiere de la solicitada, se marca como "Reprogramada por proveedor".</div>
                 </div>
                 <div className="fld">
                   <label>Comentario</label>

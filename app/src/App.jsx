@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { useSesion } from './lib/auth'
-import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG } from './lib/derive'
+import { fmt, fdate, nombreMes, enrich, withEntregas, SEM, EST_TAG, GES_TAG, CONF_TAG } from './lib/derive'
 import { ultimasImportaciones, hace } from './lib/importaciones'
 import { fetchAll } from './lib/importer'
 import Panel from './Panel'
@@ -54,6 +54,7 @@ export default function App() {
   const [fProv, setFProv] = useState('')
   const [fComp, setFComp] = useState('')
   const [fMes, setFMes] = useState('')
+  const [fConf, setFConf] = useState('')
   const [quick, setQuick] = useState('')
   const [soloTol, setSoloTol] = useState(false)
   const [sortK, setSortK] = useState('sem2')
@@ -107,6 +108,7 @@ export default function App() {
     const sf = ab.filter(r => r.sem2 === 'sinfecha')
     const vs = ab.filter(r => r.moneda === 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const vd = ab.filter(r => r.moneda !== 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
+    const pc = ab.filter(r => r.estado_confirmacion === 'Pendiente').length
     const rp = rows.filter(r => r.hist.length).length
     const tl = rows.filter(r => r.dentroTolerancia).length
     const fd = rows.filter(r => r.fueraTolerancia).length
@@ -118,6 +120,7 @@ export default function App() {
       { id: 'sinfecha', lb: 'Sin fecha programada', vl: sf.length, ft: 'necesitan fecha', cl: 'a' },
       { id: 'porllegar', lb: 'Llegan en 7 dias', vl: pl.length, ft: 'ventana inmediata', cl: 'a' },
       { id: 'repro', lb: 'Reprogramadas', vl: rp, ft: 'con fecha movida', cl: 'a' },
+      { id: 'sinconf', lb: 'Sin confirmar', vl: pc, ft: 'pendientes de confirmacion', cl: pc > 0 ? 'a' : '' },
       { id: 'desviado', lb: 'Cerradas fuera de tolerancia', vl: fd, ft: 'revisar si afecta el abastecimiento', cl: fd > 0 ? 'r' : '' },
       { id: 'cerrado', lb: 'Cerradas', vl: cc + tl + fd, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia, ${fmt(fd)} fuera de tolerancia`, cl: 'g' },
       { id: 'valor', lb: 'Valor pendiente', vl: `S/ ${fmt(vs)}`, ft: `mas US$ ${fmt(vd)}`, cl: '' },
@@ -136,7 +139,9 @@ export default function App() {
       if (fProv && r.proveedor !== fProv) return false
       if (fComp && r.comprador !== fComp) return false
       if (fMes && r.fecha_programada_ingreso?.slice(0, 7) !== fMes) return false
+      if (fConf && r.estado_confirmacion !== fConf) return false
       if (quick === 'abierto' && !r.abierto) return false
+      if (quick === 'sinconf' && r.estado_confirmacion !== 'Pendiente') return false
       if (quick === 'cerrado' && r.abierto) return false
       if (quick === 'atrasado' && r.sem2 !== 'atrasado') return false
       if (quick === 'sinfecha' && r.sem2 !== 'sinfecha') return false
@@ -155,7 +160,7 @@ export default function App() {
       return (x > y ? 1 : x < y ? -1 : 0) * sortD
     })
     return out
-  }, [rows, q, fEst, fGes, fProv, fComp, fMes, quick, soloTol, sortK, sortD])
+  }, [rows, q, fEst, fGes, fProv, fComp, fMes, fConf, quick, soloTol, sortK, sortD])
 
   const selected = filtradas.find(r => r.id_entrega === selectedId) || rows.find(r => r.id_entrega === selectedId)
 
@@ -165,7 +170,7 @@ export default function App() {
   }
 
   function limpiar() {
-    setQInput(''); setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes('')
+    setQInput(''); setQ(''); setFEst(''); setFGes(''); setFProv(''); setFComp(''); setFMes(''); setFConf('')
     setQuick(''); setSoloTol(false)
   }
 
@@ -281,6 +286,12 @@ export default function App() {
             <select value={fMes} onChange={e => setFMes(e.target.value)}>
               <option value="">Todos los meses</option>
               {meses.map(m => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}
+            </select>
+            <select value={fConf} onChange={e => setFConf(e.target.value)}>
+              <option value="">Toda confirmacion</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="Confirmada">Confirmada</option>
+              <option value="Reprogramada por proveedor">Reprogramada por proveedor</option>
             </select>
             <button className={`btn ${soloTol ? 'act' : ''}`} onClick={() => setSoloTol(v => !v)}>Solo tolerancia</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>

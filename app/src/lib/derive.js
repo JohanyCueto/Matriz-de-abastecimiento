@@ -36,6 +36,7 @@ export const SEM = {
 }
 export const EST_TAG = { Completo: 't-grn', Pendiente: 't-blu' }
 export const GES_TAG = { 'En seguimiento': 't-blu', Reprogramado: 't-amb', Atrasado: 't-red', Cerrado: 't-gry' }
+export const CONF_TAG = { Pendiente: 't-amb', Confirmada: 't-grn', 'Reprogramada por proveedor': 't-red' }
 
 export const MOTIVOS = ['', 'Falta de stock proveedor', 'Demora producción proveedor', 'Demora logística / despacho', 'Ingreso parcial', 'Reprogramación interna']
 export const RESP = ['', 'Compras', 'Proveedor', 'Planeamiento', 'Almacén', 'Calidad']
@@ -85,6 +86,10 @@ export function enrich(r) {
   else sem2 = 'enfecha'
   const hist = Array.isArray(r.historial) ? r.historial : []
   const fprog0 = hist.length ? hist[0].de : r.fecha_programada_ingreso
+  const estado_confirmacion = !abierto ? null
+    : !r.fecha_confirmada ? 'Pendiente'
+    : r.fecha_confirmada === r.fecha_programada_ingreso ? 'Confirmada'
+    : 'Reprogramada por proveedor'
   // La Gestion se recalcula sola, igual que los Dias: si ya no queda nada
   // pendiente (o alguien la cerro a mano), se ve Cerrado; si se paso la
   // fecha y sigue con saldo, Atrasado; si no, se respeta lo que haya
@@ -99,5 +104,5 @@ export function enrich(r) {
   // cerraste (aunque sea con tolerancia y le falte un poco), ya no cuenta
   // como pendiente.
   const estadoIngreso = abierto ? 'Pendiente' : 'Completo'
-  return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
+  return { ...r, estado_gestion: estadoGestion, estado_ingreso: estadoIngreso, estado_confirmacion, abierto, tol, dentroTolerancia, fueraTolerancia, dd, avance, desv, sem2, hist, fprog0 }
 }
