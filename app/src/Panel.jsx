@@ -170,8 +170,12 @@ export default function Panel({ row, esEditor, onClose, onSaved }) {
                 </div>
                 <div className="fld">
                   <label>Fecha confirmada por proveedor</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 400, cursor: 'pointer', marginBottom: 4 }}>
+                    <input type="checkbox" checked={fecConf === fec && !!fec} onChange={e => setFecConf(e.target.checked ? fec : '')} />
+                    Confirma misma fecha solicitada
+                  </label>
                   <input type="date" value={fecConf || ''} onChange={e => setFecConf(e.target.value)} />
-                  <div className="hint">La fecha que el proveedor confirma para esta entrega. Si difiere de la solicitada, se marca como "Reprogramada por proveedor".</div>
+                  <div className="hint">Si el proveedor confirma otra fecha, ingresala manualmente.</div>
                 </div>
                 <div className="fld">
                   <label>Comentario</label>
