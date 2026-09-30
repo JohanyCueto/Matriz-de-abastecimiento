@@ -31,6 +31,7 @@ const COLS = [
   { k: 'saldo_pendiente', l: 'Saldo', n: 1 },
   { k: 'avance', l: 'Avance', w: '126px' },
   { k: 'fecha_programada_ingreso', l: 'F. programada' },
+  { k: 'estado_confirmacion', l: 'Confirmacion' },
   { k: 'dd', l: 'Dias', n: 1 },
   { k: 'desv', l: 'Tolerancia', w: '92px' },
   { k: 'estado_ingreso', l: 'Ingreso' },
@@ -192,6 +193,9 @@ export default function App() {
         <span className="mono">{fdate(r.fecha_programada_ingreso)}</span>
         {r.hist.length > 0 && <span className="rep" title={`Reprogramada ${r.hist.length} ${r.hist.length === 1 ? 'vez' : 'veces'}. Fecha original ${fdate(r.fprog0)}`}>R{r.hist.length > 1 ? r.hist.length : ''}</span>}
       </>
+      case 'estado_confirmacion':
+        if (!r.estado_confirmacion) return <span className="dim">-</span>
+        return <span className={`tag ${CONF_TAG[r.estado_confirmacion] || 't-gry'}`}>{r.estado_confirmacion === 'Reprogramada por proveedor' ? 'Reprog. prov.' : r.estado_confirmacion}</span>
       case 'dd':
         if (r.dentroTolerancia) return <span className="dim">tolerancia</span>
         if (r.fueraTolerancia) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>fuera de tolerancia</span>
