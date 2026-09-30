@@ -238,3 +238,19 @@ tbody tr.sel{background:#f2f5f9}
 .conf-fila{display:flex;gap:12px;align-items:center;font-size:13px;padding:8px 12px;background:var(--bg);border-radius:8px}
 .conf-fila b{flex:1}
 .conf-btns{display:flex;gap:10px;justify-content:flex-end}
+
+/* --- Seguimiento OI: pipeline de etapas --- */
+.pn-oi{max-width:520px}
+.oi-pipeline{display:flex;flex-direction:column;gap:0}
+.oi-step{position:relative;padding-left:28px;padding-bottom:4px}
+.oi-step:not(:last-child)::before{content:'';position:absolute;left:9px;top:24px;bottom:0;width:2px;background:var(--line)}
+.oi-step.done:not(:last-child)::before{background:var(--grn)}
+.oi-step-head{display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0;user-select:none}
+.oi-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);background:var(--card);flex-shrink:0;position:relative;left:-28px;margin-right:-20px}
+.oi-step.done .oi-dot{background:var(--grn);border-color:var(--grn)}
+.oi-step.active .oi-dot{background:var(--blu);border-color:var(--blu)}
+.oi-step-label{font-size:13px;font-weight:500;color:var(--ink2)}
+.oi-step.active .oi-step-label{color:var(--ink);font-weight:600}
+.oi-step.done .oi-step-label{color:var(--ink3)}
+.oi-step-body{padding:6px 0 12px 0}
+.oi-check{display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0;cursor:pointer}

@@ -1,0 +1,211 @@
+import { useEffect, useMemo, useState } from 'react'
+import { fmt, fdate } from './lib/derive'
+import { cargarOI, etapaLabel, calcularEtapa } from './lib/seguimientoOI'
+import PanelOI from './PanelOI'
+import { useSesion } from './lib/auth'
+
+const ETAPA_TAG = {
+  1: 't-amb', 2: 't-amb', 3: 't-blu', 4: 't-blu',
+  5: 't-amb', 6: 't-red', 7: 't-amb', 8: 't-amb', 9: 't-grn',
+}
+
+const COLS_OI = [
+  { k: 'etapa', l: 'Etapa', w: '170px' },
+  { k: 'oc', l: 'OI' },
+  { k: 'sku', l: 'SKU' },
+  { k: 'descripcion', l: 'Material' },
+  { k: 'proveedor', l: 'Proveedor' },
+  { k: 'comprador', l: 'Comprador', w: '104px' },
+  { k: 'incoterm', l: 'Incoterm', w: '80px' },
+  { k: 'cant_programada', l: 'Programado', n: 1 },
+  { k: 'saldo_pendiente', l: 'Saldo', n: 1 },
+  { k: 'eta', l: 'ETA' },
+  { k: 'diasEta', l: 'Dias ETA', n: 1 },
+  { k: 'fecha_programada_ingreso', l: 'F. programada' },
+]
+
+export default function SeguimientoOI() {
+  const { perfil } = useSesion()
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
+
+  const [qInput, setQInput] = useState('')
+  const [q, setQ] = useState('')
+  const [fEtapa, setFEtapa] = useState('')
+  const [fProv, setFProv] = useState('')
+  const [fComp, setFComp] = useState('')
+  const [sortK, setSortK] = useState('etapa')
+  const [sortD, setSortD] = useState(1)
+
+  async function cargar() {
+    setLoading(true)
+    setErr(null)
+    try {
+      const data = await cargarOI()
+      const enriched = data.map(r => {
+        const eta = r.seg?.eta || null
+        const diasEta = eta ? Math.round((new Date(eta + 'T00:00:00') - new Date()) / 864e5) : null
+        return { ...r, incoterm: r.seg?.incoterm || '', eta, diasEta }
+      })
+      setRows(enriched)
+    } catch (e) {
+      setErr(e.message)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { cargar() }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 250)
+    return () => clearTimeout(t)
+  }, [qInput])
+
+  const proveedores = useMemo(() => [...new Set(rows.map(r => r.proveedor).filter(Boolean))].sort(), [rows])
+  const compradores = useMemo(() => [...new Set(rows.map(r => r.comprador).filter(Boolean))].sort(), [rows])
+
+  const kpis = useMemo(() => {
+    const byEtapa = {}
+    for (let i = 1; i <= 9; i++) byEtapa[i] = 0
+    rows.forEach(r => { byEtapa[r.etapa] = (byEtapa[r.etapa] || 0) + 1 })
+    return [
+      { id: '', lb: 'Total OI', vl: rows.length, cl: '' },
+      { id: '1', lb: 'Culminación', vl: byEtapa[1], cl: byEtapa[1] > 0 ? 'a' : '' },
+      { id: '3', lb: 'Despacho', vl: byEtapa[2] + byEtapa[3], cl: '' },
+      { id: '4', lb: 'Documentos', vl: byEtapa[4], cl: '' },
+      { id: '5', lb: 'Numeración', vl: byEtapa[5], cl: '' },
+      { id: '6', lb: 'Pago', vl: byEtapa[6], cl: byEtapa[6] > 0 ? 'r' : '' },
+      { id: '7', lb: 'Desaduanaje', vl: byEtapa[7], cl: byEtapa[7] > 0 ? 'a' : '' },
+      { id: '8', lb: 'Ingreso', vl: byEtapa[8], cl: '' },
+      { id: '9', lb: 'Completadas', vl: byEtapa[9], cl: 'g' },
+    ]
+  }, [rows])
+
+  const filtradas = useMemo(() => {
+    const qq = q.trim().toLowerCase()
+    let out = rows.filter(r => {
+      if (qq) {
+        const busca = `${r.oc} ${r.sku} ${r.descripcion || ''} ${r.proveedor || ''} ${r.comprador || ''}`.toLowerCase()
+        if (!busca.includes(qq)) return false
+      }
+      if (fEtapa) {
+        if (fEtapa === '3') { if (r.etapa !== 2 && r.etapa !== 3) return false }
+        else if (Number(fEtapa) !== r.etapa) return false
+      }
+      if (fProv && r.proveedor !== fProv) return false
+      if (fComp && r.comprador !== fComp) return false
+      return true
+    })
+    out.sort((a, b) => {
+      let x = a[sortK], y = b[sortK]
+      if (x == null) x = ''
+      if (y == null) y = ''
+      return (x > y ? 1 : x < y ? -1 : 0) * sortD
+    })
+    return out
+  }, [rows, q, fEtapa, fProv, fComp, sortK, sortD])
+
+  const selected = rows.find(r => r.id_entrega === selectedId)
+
+  function toggleSort(k) {
+    if (sortK === k) setSortD(d => -d)
+    else { setSortK(k); setSortD(1) }
+  }
+
+  function actualizarFila(id, segPatch) {
+    setRows(prev => prev.map(r => {
+      if (r.id_entrega !== id) return r
+      const newSeg = { ...(r.seg || {}), ...segPatch }
+      const etapa = calcularEtapa(newSeg)
+      const eta = newSeg.eta || null
+      const diasEta = eta ? Math.round((new Date(eta + 'T00:00:00') - new Date()) / 864e5) : null
+      return { ...r, seg: newSeg, etapa, etapaLabel: etapaLabel(etapa), incoterm: newSeg.incoterm || '', eta, diasEta }
+    }))
+  }
+
+  function celda(r, k) {
+    switch (k) {
+      case 'etapa': return <span className={`tag ${ETAPA_TAG[r.etapa] || 't-gry'}`}>{r.etapaLabel}</span>
+      case 'oc': return <span className="mono">{r.oc}</span>
+      case 'sku': return <span className="mono">{r.sku}</span>
+      case 'descripcion': return <div className="dsc">{r.descripcion || ''}</div>
+      case 'proveedor': return <div className="prov">{r.proveedor || ''}</div>
+      case 'comprador': return <span className={`nw ${!r.comprador ? 'dim' : ''}`}>{r.comprador || 'Sin asignar'}</span>
+      case 'incoterm': return r.incoterm ? <span className="tag t-blu">{r.incoterm}</span> : <span className="dim">-</span>
+      case 'cant_programada': return fmt(r.cant_programada)
+      case 'saldo_pendiente': return r.saldo_pendiente > 0 ? <b style={{ fontWeight: 500 }}>{fmt(r.saldo_pendiente)}</b> : <span className="dim">0</span>
+      case 'eta': return r.eta ? <span className="mono">{fdate(r.eta)}</span> : <span className="dim">-</span>
+      case 'diasEta':
+        if (r.diasEta == null) return <span className="dim">-</span>
+        if (r.diasEta < 0) return <span style={{ color: 'var(--red)', fontWeight: 500 }}>{-r.diasEta} atraso</span>
+        return <span className="dim">faltan {r.diasEta}</span>
+      case 'fecha_programada_ingreso': return <span className="mono">{fdate(r.fecha_programada_ingreso)}</span>
+      default: return null
+    }
+  }
+
+  const esEditor = perfil?.rol === 'editor'
+
+  return (
+    <>
+      {err && <div className="empty">No se pudo cargar: {err}</div>}
+      {loading ? <div className="empty">Cargando OI...</div> : (
+        <>
+          <div className="kpis">
+            {kpis.map(k => (
+              <div key={k.lb} className={`kpi ${k.cl} ${fEtapa === k.id && k.id ? 'on' : ''}`}
+                onClick={() => { if (!k.id) return; setFEtapa(prev => prev === k.id ? '' : k.id) }}>
+                <div className="lb">{k.lb}</div>
+                <div className="vl">{fmt(k.vl)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bar">
+            <input type="text" placeholder="Buscar por OI, SKU, material o proveedor" value={qInput} onChange={e => setQInput(e.target.value)} />
+            <select value={fProv} onChange={e => setFProv(e.target.value)}>
+              <option value="">Todos los proveedores</option>
+              {proveedores.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <select value={fComp} onChange={e => setFComp(e.target.value)}>
+              <option value="">Todos los compradores</option>
+              {compradores.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <button className="btn" onClick={() => { setQInput(''); setQ(''); setFEtapa(''); setFProv(''); setFComp('') }}>Limpiar</button>
+            <span className="count">{fmt(filtradas.length)} líneas OI</span>
+          </div>
+
+          <div className="tw">
+            <div className="scroll">
+              <table>
+                <thead>
+                  <tr>
+                    {COLS_OI.map(c => (
+                      <th key={c.k} className={c.n ? 'num' : ''} style={c.w ? { width: c.w } : undefined} onClick={() => toggleSort(c.k)}>
+                        {c.l}{sortK === c.k && <span className="ar">{sortD > 0 ? '▲' : '▼'}</span>}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtradas.map(r => (
+                    <tr key={r.id_entrega} className={selectedId === r.id_entrega ? 'sel' : ''} onClick={() => setSelectedId(r.id_entrega)}>
+                      {COLS_OI.map(c => <td key={c.k} className={c.n ? 'num' : ''}>{celda(r, c.k)}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filtradas.length === 0 && <div className="empty">No hay OI con estos filtros.</div>}
+            </div>
+          </div>
+        </>
+      )}
+
+      {selected && (
+        <PanelOI row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
+      )}
+    </>
+  )
+}

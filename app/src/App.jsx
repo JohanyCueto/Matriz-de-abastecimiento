@@ -11,6 +11,7 @@ import ImportButton from './ImportButton'
 import ImportIngresosButton from './ImportIngresosButton'
 import ExportButton from './ExportButton'
 import Explosion from './Explosion'
+import SeguimientoOI from './SeguimientoOI'
 import Login from './Login'
 import './App.css'
 
@@ -251,10 +252,11 @@ export default function App() {
 
       <div className="bar" style={{ marginBottom: 14 }}>
         <button className={`btn ${vista === 'oc' ? 'act' : ''}`} onClick={() => setVista('oc')}>Seguimiento OC</button>
+        <button className={`btn ${vista === 'oi' ? 'act' : ''}`} onClick={() => setVista('oi')}>Seguimiento OI</button>
         <button className={`btn ${vista === 'explosion' ? 'act' : ''}`} onClick={() => setVista('explosion')}>Explosión de materiales</button>
       </div>
 
-      {vista === 'explosion' ? <Explosion /> : <>
+      {vista === 'oi' ? <SeguimientoOI /> : vista === 'explosion' ? <Explosion /> : <>
       {err && <div className="empty">No se pudo cargar la base: {err}</div>}
       {loading ? <div className="empty">Cargando...</div> : (
         <>
