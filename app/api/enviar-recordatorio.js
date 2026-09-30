@@ -13,6 +13,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Faltan campos: to, subject, html' })
   }
 
+  const ALWAYS_CC = 'rramirez@roxfarma.com'
+  const ccList = cc
+    ? (Array.isArray(cc) ? cc : cc.split(/[;,]\s*/)).filter(Boolean)
+    : []
+  if (!ccList.some(e => e.toLowerCase() === ALWAYS_CC)) ccList.push(ALWAYS_CC)
+
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -23,7 +29,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         from: process.env.CORREO_REMITENTE || 'Roxfarma Compras <onboarding@resend.dev>',
         to: Array.isArray(to) ? to : [to],
-        cc: cc ? (Array.isArray(cc) ? cc : [cc]) : undefined,
+        cc: ccList.length > 0 ? ccList : undefined,
         subject,
         html,
       }),

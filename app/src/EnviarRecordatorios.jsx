@@ -17,6 +17,8 @@ function hace(iso) {
   return `hace ${dias} dia${dias > 1 ? 's' : ''}`
 }
 
+const ALWAYS_CC = 'rramirez@roxfarma.com'
+
 export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
   const [contactos, setContactos] = useState([])
   const [historial, setHistorial] = useState([])
@@ -29,6 +31,7 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
   const [cargando, setCargando] = useState(true)
   const [aprobados, setAprobados] = useState({})
   const [confirmar, setConfirmar] = useState(false)
+  const [asuntoEditado, setAsuntoEditado] = useState({})
 
   useEffect(() => {
     Promise.all([
@@ -112,7 +115,8 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
       setEnviando(prov.nombre)
       setResultado(prev => ({ ...prev, [prov.nombre]: null }))
       const html = generarEmailHtml(prov.nombre, prov.filas)
-      const asunto = generarAsunto(prov.nombre, prov.filas)
+      const asuntoBase = generarAsunto(prov.nombre, prov.filas)
+      const asunto = asuntoEditado[prov.nombre] || asuntoBase
       try {
         await enviarRecordatorio(
           prov.contacto.correo,
@@ -185,19 +189,39 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
     const prov = porProveedor.find(p => p.nombre === vistaPrevia)
     if (!prov) { setVistaPrevia(null); return null }
     const html = generarEmailHtml(prov.nombre, prov.filas)
-    const asunto = generarAsunto(prov.nombre, prov.filas)
+    const asuntoBase = generarAsunto(prov.nombre, prov.filas)
+    const asuntoActual = asuntoEditado[prov.nombre] ?? asuntoBase
+    const ccProv = prov.contacto?.correo_cc
+    const ccCompleto = ccProv
+      ? (ccProv.includes(ALWAYS_CC) ? ccProv : `${ccProv}; ${ALWAYS_CC}`)
+      : ALWAYS_CC
     return (
       <div className="mdl-ov" onClick={() => setVistaPrevia(null)}>
         <div className="mdl mdl-wide" onClick={e => e.stopPropagation()}>
           <div className="mdl-h">
             <h2>Revisar correo — {prov.nombre}</h2>
+            <a
+              href="/contactos"
+              target="_blank"
+              rel="noreferrer"
+              className="btn"
+              style={{ background: 'var(--acc)', color: '#fff', textDecoration: 'none', marginRight: 'auto' }}
+            >Gestionar contactos</a>
             <button className="btn" onClick={() => setVistaPrevia(null)}>Volver</button>
           </div>
           <div className="mdl-b">
             <div className="prev-info">
               <span><b>Para:</b> {prov.contacto?.correo || '(sin correo)'}</span>
-              {prov.contacto?.correo_cc && <span><b>CC:</b> {prov.contacto.correo_cc}</span>}
-              <span><b>Asunto:</b> {asunto}</span>
+              <span><b>CC:</b> {ccCompleto}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <b>Asunto:</b>
+                <input
+                  type="text"
+                  value={asuntoActual}
+                  onChange={e => setAsuntoEditado(prev => ({ ...prev, [prov.nombre]: e.target.value }))}
+                  style={{ flex: 1, padding: '4px 8px', border: '1px solid var(--line)', borderRadius: 4, fontSize: '12.5px' }}
+                />
+              </span>
               <span><b>Entregas:</b> {prov.filas.length} pendiente{prov.filas.length > 1 ? 's' : ''}{prov.atrasadas > 0 ? `, ${prov.atrasadas} atrasada${prov.atrasadas > 1 ? 's' : ''}` : ''}</span>
             </div>
             <div className="prev-frame">
@@ -238,6 +262,13 @@ export default function EnviarRecordatorios({ rows, esEditor, onClose }) {
       <div className="mdl mdl-wide" onClick={e => e.stopPropagation()}>
         <div className="mdl-h">
           <h2>Recordatorios por correo</h2>
+          <a
+            href="/contactos"
+            target="_blank"
+            rel="noreferrer"
+            className="btn"
+            style={{ background: 'var(--acc)', color: '#fff', textDecoration: 'none' }}
+          >Gestionar contactos</a>
           <button className="btn" onClick={onClose}>Cerrar</button>
         </div>
         <div className="mdl-b">
