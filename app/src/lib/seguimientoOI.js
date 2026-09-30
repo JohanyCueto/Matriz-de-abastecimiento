@@ -18,7 +18,8 @@ export function etapasVisibles(incoterm) {
   return ETAPAS.filter(e => e.n !== 2)
 }
 
-export function calcularEtapa(seg) {
+export function calcularEtapa(seg, row) {
+  if (row && row.fecha_real_ingreso) return 9
   if (!seg) return 1
   const inc = seg.incoterm
   if (!(seg.cantidad_lista && seg.fecha_disponibilidad)) return 1
@@ -55,7 +56,7 @@ export async function cargarOI() {
   const rows = withEntregas(oc.map(r => {
     const s = segMap.get(r.id_entrega) || null
     const enriched = enrich(r)
-    const etapa = calcularEtapa(s)
+    const etapa = calcularEtapa(s, enriched)
     return { ...enriched, seg: s, etapa, etapaLabel: etapaLabel(etapa) }
   }))
   return rows

@@ -18,7 +18,9 @@ const COLS_OI = [
   { k: 'comprador', l: 'Comprador', w: '104px' },
   { k: 'incoterm', l: 'Incoterm', w: '80px' },
   { k: 'cant_programada', l: 'Programado', n: 1 },
+  { k: 'cant_ingresada', l: 'Ingresado', n: 1 },
   { k: 'saldo_pendiente', l: 'Saldo', n: 1 },
+  { k: 'estado_ingreso', l: 'Ingreso' },
   { k: 'eta', l: 'ETA' },
   { k: 'diasEta', l: 'Dias ETA', n: 1 },
   { k: 'fecha_programada_ingreso', l: 'F. programada' },
@@ -118,7 +120,7 @@ export default function SeguimientoOI() {
     setRows(prev => prev.map(r => {
       if (r.id_entrega !== id) return r
       const newSeg = { ...(r.seg || {}), ...segPatch }
-      const etapa = calcularEtapa(newSeg)
+      const etapa = calcularEtapa(newSeg, r)
       const eta = newSeg.eta || null
       const diasEta = eta ? Math.round((new Date(eta + 'T00:00:00') - new Date()) / 864e5) : null
       return { ...r, seg: newSeg, etapa, etapaLabel: etapaLabel(etapa), incoterm: newSeg.incoterm || '', eta, diasEta }
@@ -135,7 +137,12 @@ export default function SeguimientoOI() {
       case 'comprador': return <span className={`nw ${!r.comprador ? 'dim' : ''}`}>{r.comprador || 'Sin asignar'}</span>
       case 'incoterm': return r.incoterm ? <span className="tag t-blu">{r.incoterm}</span> : <span className="dim">-</span>
       case 'cant_programada': return fmt(r.cant_programada)
+      case 'cant_ingresada': return fmt(r.cant_ingresada)
       case 'saldo_pendiente': return r.saldo_pendiente > 0 ? <b style={{ fontWeight: 500 }}>{fmt(r.saldo_pendiente)}</b> : <span className="dim">0</span>
+      case 'estado_ingreso': {
+        const EST_TAG = { Completo: 't-grn', Pendiente: 't-blu' }
+        return <span className={`tag ${EST_TAG[r.estado_ingreso] || 't-gry'}`}>{r.estado_ingreso}</span>
+      }
       case 'eta': return r.eta ? <span className="mono">{fdate(r.eta)}</span> : <span className="dim">-</span>
       case 'diasEta':
         if (r.diasEta == null) return <span className="dim">-</span>

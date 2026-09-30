@@ -102,7 +102,10 @@ export default function PanelOI({ row, esEditor, onClose, onSaved }) {
             <div className="kv"><span>Proveedor</span><b>{row.proveedor || ''}</b></div>
             <div className="kv"><span>Comprador</span><b>{row.comprador || 'Sin asignar'}</b></div>
             <div className="kv"><span>Cantidad programada</span><b>{fmt(row.cant_programada)}</b></div>
+            <div className="kv"><span>Cantidad ingresada</span><b>{fmt(row.cant_ingresada)}</b></div>
+            <div className="kv"><span>Saldo pendiente</span><b style={{ color: row.saldo_pendiente > 0 ? 'var(--red)' : 'var(--ink3)' }}>{fmt(row.saldo_pendiente)}</b></div>
             <div className="kv"><span>Fecha programada</span><b>{fdate(row.fecha_programada_ingreso)}</b></div>
+            {row.fecha_real_ingreso && <div className="kv"><span>Fecha real de ingreso</span><b style={{ color: 'var(--grn)' }}>{fdate(row.fecha_real_ingreso)}</b></div>}
             <div className="kv"><span>Precio unitario</span><b>{fmtM(row.precio_unitario, row.moneda)}</b></div>
             <div className="kv"><span>Valor entrega</span><b>{fmtM(row.valor_entrega, row.moneda)}</b></div>
           </div>
