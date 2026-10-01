@@ -54,17 +54,15 @@ export async function exportarCuadroAlmacen(mesClave) {
   const data = await fetchAll('programacion_oc',
     'sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,fecha_real_ingreso,fecha_comunicada_almacen')
 
-  const conOrigen = data
-    .filter(r => r.fecha_comunicada_almacen)
+  const delMes = data
+    .filter(r => r.fecha_programada_ingreso && r.fecha_programada_ingreso.slice(0, 7) === mesClave)
     .map(r => ({
       ...r,
-      origen: r.fecha_comunicada_almacen,
-      reprogramada: r.fecha_programada_ingreso !== r.fecha_comunicada_almacen ? r.fecha_programada_ingreso : null,
+      fechaMostrar: r.fecha_comunicada_almacen || r.fecha_programada_ingreso,
+      reprogramada: r.fecha_comunicada_almacen && r.fecha_comunicada_almacen !== r.fecha_programada_ingreso
+        ? r.fecha_programada_ingreso : null,
     }))
-
-  const delMes = conOrigen
-    .filter(r => r.origen.slice(0, 7) === mesClave)
-    .sort((a, b) => a.origen.localeCompare(b.origen))
+    .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso))
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet(nombreMes(mesClave).slice(0, 31))
@@ -99,7 +97,7 @@ export async function exportarCuadroAlmacen(mesClave) {
       r.cant_programada,
       r.cant_programada,
       'UNIDAD',
-      r.origen ? new Date(r.origen + 'T00:00:00') : null,
+      r.fechaMostrar ? new Date(r.fechaMostrar + 'T00:00:00') : null,
       r.proveedor,
       r.reprogramada ? new Date(r.reprogramada + 'T00:00:00') : null,
       r.fecha_real_ingreso ? 'Ingreso' : 'Pendiente',
