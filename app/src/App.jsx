@@ -98,12 +98,46 @@ export default function App() {
 
   const rowsOC = useMemo(() => rows.filter(r => r.origen !== 'Importado'), [rows])
 
-  const proveedores = useMemo(() => [...new Set(rowsOC.map(r => r.proveedor).filter(Boolean))].sort(), [rowsOC])
-  const compradores = useMemo(() => [...new Set(rowsOC.map(r => r.comprador).filter(Boolean))].sort(), [rowsOC])
+  function matchRow(r, skip) {
+    const qq = q.trim().toLowerCase()
+    if (qq) {
+      const busca = `${r.oc} ${r.sku} ${r.descripcion || ''} ${r.proveedor || ''} ${r.comprador || ''}`.toLowerCase()
+      if (!busca.includes(qq)) return false
+    }
+    if (skip !== 'est' && fEst && r.estado_ingreso !== fEst) return false
+    if (skip !== 'ges' && fGes && r.estado_gestion !== fGes) return false
+    if (skip !== 'prov' && fProv && r.proveedor !== fProv) return false
+    if (skip !== 'comp' && fComp && r.comprador !== fComp) return false
+    if (skip !== 'mes' && fMes && r.fecha_programada_ingreso?.slice(0, 7) !== fMes) return false
+    if (skip !== 'conf' && fConf && r.estado_confirmacion !== fConf) return false
+    if (quick === 'abierto' && !r.abierto) return false
+    if (quick === 'sinconf' && r.estado_confirmacion !== 'Pendiente') return false
+    if (quick === 'cerrado' && r.abierto) return false
+    if (quick === 'atrasado' && r.sem2 !== 'atrasado') return false
+    if (quick === 'sinfecha' && r.sem2 !== 'sinfecha') return false
+    if (quick === 'porllegar' && r.sem2 !== 'porllegar') return false
+    if (quick === 'repro' && !r.hist.length) return false
+    if (quick === 'desviado' && r.sem2 !== 'desviado') return false
+    if (soloTol && !r.tol) return false
+    return true
+  }
+
+  const proveedores = useMemo(() =>
+    [...new Set(rowsOC.filter(r => matchRow(r, 'prov')).map(r => r.proveedor).filter(Boolean))].sort()
+  , [rowsOC, q, fEst, fGes, fComp, fMes, fConf, quick, soloTol])
+
+  const compradores = useMemo(() =>
+    [...new Set(rowsOC.filter(r => matchRow(r, 'comp')).map(r => r.comprador).filter(Boolean))].sort()
+  , [rowsOC, q, fEst, fGes, fProv, fMes, fConf, quick, soloTol])
+
   const meses = useMemo(() => {
-    const claves = [...new Set(rowsOC.map(r => r.fecha_programada_ingreso?.slice(0, 7)).filter(Boolean))].sort()
+    const claves = [...new Set(rowsOC.filter(r => matchRow(r, 'mes')).map(r => r.fecha_programada_ingreso?.slice(0, 7)).filter(Boolean))].sort()
     return claves.map(k => ({ valor: k, etiqueta: nombreMes(k) }))
-  }, [rowsOC])
+  }, [rowsOC, q, fEst, fGes, fProv, fComp, fConf, quick, soloTol])
+
+  useEffect(() => { if (fProv && !proveedores.includes(fProv)) setFProv('') }, [proveedores, fProv])
+  useEffect(() => { if (fComp && !compradores.includes(fComp)) setFComp('') }, [compradores, fComp])
+  useEffect(() => { if (fMes && !meses.some(m => m.valor === fMes)) setFMes('') }, [meses, fMes])
 
   const kpis = useMemo(() => {
     const ab = rowsOC.filter(r => r.abierto)
@@ -132,29 +166,7 @@ export default function App() {
   }, [rowsOC])
 
   const filtradas = useMemo(() => {
-    const qq = q.trim().toLowerCase()
-    let out = rowsOC.filter(r => {
-      if (qq) {
-        const busca = `${r.oc} ${r.sku} ${r.descripcion || ''} ${r.proveedor || ''} ${r.comprador || ''}`.toLowerCase()
-        if (!busca.includes(qq)) return false
-      }
-      if (fEst && r.estado_ingreso !== fEst) return false
-      if (fGes && r.estado_gestion !== fGes) return false
-      if (fProv && r.proveedor !== fProv) return false
-      if (fComp && r.comprador !== fComp) return false
-      if (fMes && r.fecha_programada_ingreso?.slice(0, 7) !== fMes) return false
-      if (fConf && r.estado_confirmacion !== fConf) return false
-      if (quick === 'abierto' && !r.abierto) return false
-      if (quick === 'sinconf' && r.estado_confirmacion !== 'Pendiente') return false
-      if (quick === 'cerrado' && r.abierto) return false
-      if (quick === 'atrasado' && r.sem2 !== 'atrasado') return false
-      if (quick === 'sinfecha' && r.sem2 !== 'sinfecha') return false
-      if (quick === 'porllegar' && r.sem2 !== 'porllegar') return false
-      if (quick === 'repro' && !r.hist.length) return false
-      if (quick === 'desviado' && r.sem2 !== 'desviado') return false
-      if (soloTol && !r.tol) return false
-      return true
-    })
+    let out = rowsOC.filter(r => matchRow(r))
     const ord = { atrasado: 0, desviado: 1, sinfecha: 2, porllegar: 3, enfecha: 4, tolerancia: 5, cerrado: 6 }
     out.sort((a, b) => {
       if (sortK === 'sem2') return (ord[a.sem2] - ord[b.sem2]) * sortD
