@@ -30,6 +30,17 @@ function toNumero(v) {
 // bloque de titulo arriba de tamaño distinto (algunas empiezan la tabla en
 // la fila 1, otras en la 16). En vez de asumir una fila fija, se busca la
 // fila que dice "CODIGO" en la primera columna.
+function normProv(s) {
+  if (!s) return ''
+  return s.trim().replace(/\r|\n/g, '').toLowerCase().replace(/\s+/g, ' ')
+}
+
+function provMatch(sysName, xlsName) {
+  if (!sysName || !xlsName) return false
+  const a = normProv(sysName), b = normProv(xlsName)
+  return a.startsWith(b) || b.startsWith(a)
+}
+
 function filasDeHoja(hoja) {
   const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: null, raw: false })
   const idxHeader = filas.findIndex(f => String(f[0] || '').trim().toUpperCase().startsWith('CÓDIGO') || String(f[0] || '').trim().toUpperCase().startsWith('CODIGO'))
@@ -37,10 +48,10 @@ function filasDeHoja(hoja) {
   return filas.slice(idxHeader + 1)
     .filter(f => f[0] != null && f[0] !== '')
     .map(f => ({
-      sku: String(f[0]).trim(),
+      sku: String(f[0]).trim().replace(/\s/g, '').padStart(9, '0'),
       cantidad: toNumero(f[3] ?? f[2]),
       fechaAlmacen: isoDate(f[5]),
-      proveedor: f[6] || null,
+      proveedor: f[6] ? String(f[6]).trim().replace(/\r|\n/g, '') : null,
     }))
     .filter(f => f.fechaAlmacen)
 }
@@ -69,7 +80,7 @@ export async function importarComunicacionAlmacen(file) {
   }
 
   const candidatas = await fetchAll('programacion_oc',
-    'id_entrega,sku,oc,proveedor,cant_programada,fecha_comunicada_almacen')
+    'id_entrega,sku,oc,proveedor,cant_programada,fecha_comunicada_almacen,fecha_programada_ingreso')
   const sinComunicar = candidatas.filter(r => !r.fecha_comunicada_almacen)
   const porSku = new Map()
   for (const r of sinComunicar) {
@@ -84,18 +95,37 @@ export async function importarComunicacionAlmacen(file) {
 
   for (const fila of filasArchivo) {
     const opciones = porSku.get(fila.sku) || []
-    const porCantidad = fila.cantidad != null ? opciones.filter(o => o.cant_programada === fila.cantidad) : []
-    const elegidas = porCantidad.length ? porCantidad : opciones
+    let elegidas = opciones
+
+    if (fila.cantidad != null) {
+      const porCantidad = elegidas.filter(o => o.cant_programada === fila.cantidad)
+      if (porCantidad.length) elegidas = porCantidad
+    }
+
+    if (fila.proveedor && elegidas.length > 1) {
+      const porProv = elegidas.filter(o => provMatch(o.proveedor, fila.proveedor))
+      if (porProv.length) elegidas = porProv
+    }
+
+    if (fila.fechaAlmacen && elegidas.length > 1) {
+      const target = new Date(fila.fechaAlmacen + 'T00:00:00').getTime()
+      const conFecha = elegidas.filter(o => o.fecha_programada_ingreso)
+      if (conFecha.length) {
+        conFecha.sort((a, b) =>
+          Math.abs(new Date(a.fecha_programada_ingreso + 'T00:00:00').getTime() - target) -
+          Math.abs(new Date(b.fecha_programada_ingreso + 'T00:00:00').getTime() - target)
+        )
+        const diff = Math.abs(new Date(conFecha[0].fecha_programada_ingreso + 'T00:00:00').getTime() - target) / 864e5
+        if (diff <= 45) elegidas = [conFecha[0]]
+      }
+    }
 
     if (elegidas.length === 1) {
       marcadas.push({ ...elegidas[0], fechaAlmacen: fila.fechaAlmacen })
-      // Se saca de la lista de candidatas para que otra fila del archivo
-      // (de otra hoja, o repetida) no vuelva a cruzar con esta misma
-      // entrega ya asignada.
       const lista = porSku.get(fila.sku)
       lista.splice(lista.indexOf(elegidas[0]), 1)
     } else if (elegidas.length === 0) {
-      if (existeSku.has(fila.sku)) continue // ya estaba comunicada, no hace falta avisar
+      if (existeSku.has(fila.sku)) continue
       sinEncontrar.push(fila)
     } else {
       ambiguas.push({ fila, opciones: elegidas })
