@@ -22,9 +22,9 @@ export function calcularEtapa(seg, row) {
   if (row && row.fecha_real_ingreso) return 9
   if (!seg) return 1
   const inc = seg.incoterm
-  if (!(seg.cantidad_lista && seg.fecha_disponibilidad)) return 1
+  if (!seg.fecha_disponibilidad) return 1
   if (inc === 'EXW' && !seg.fecha_recojo) return 2
-  if (!(seg.confirmacion_salida && seg.eta)) return 3
+  if (!(seg.confirmacion_salida || seg.eta)) return 3
   const docs = seg.doc_factura_comercial && seg.doc_packing_list && seg.doc_bl_awb
     && seg.doc_certificado_origen && seg.doc_seguro && seg.doc_ficha_tecnica
   if (!docs) return 4
