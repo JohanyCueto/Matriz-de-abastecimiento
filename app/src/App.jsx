@@ -355,7 +355,7 @@ export default function App() {
       )}
 
       {mostrarComunicar && (
-        <ComunicarAlmacen rows={rowsOC} onClose={() => setMostrarComunicar(false)} onActualizado={cargar} />
+        <ComunicarAlmacen rows={rowsOC} onClose={() => setMostrarComunicar(false)} />
       )}
 
       {mostrarEnviar && (
