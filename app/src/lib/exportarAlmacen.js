@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { fetchAll } from './importer'
+import { CERRADAS } from './derive'
 
 function descargarBlob(blob, nombre) {
   const url = URL.createObjectURL(blob)
@@ -16,9 +17,6 @@ const fdate = s => {
   return `${d}/${m}/${y.slice(2)}`
 }
 
-// "2026-09" para el mes actual. Se fija el dia en 1 antes de sumar meses:
-// si hoy es 31 y no se hace esto, Date puede saltarse un mes entero (ej. de
-// 31 de agosto a 31 de setiembre, que no existe, salta a octubre).
 export function claveMes(offset = 0) {
   const d = new Date()
   d.setDate(1)
@@ -32,46 +30,31 @@ export function nombreMes(clave) {
   return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${y}`
 }
 
-// El cuadro que Johany sube a la carpeta compartida de SharePoint para
-// almacen, un archivo por mes (como ella ya los organiza: "SETIEMBRE ME",
-// etc.). Formato acordado con almacen:
-// - "Fecha ingreso almacen" es la fecha que se le comunico a almacen la
-//   primera vez (fecha_comunicada_almacen), no la que calcula el sistema
-//   internamente: no se toca despues aunque la entrega se reprograme.
-// - Mientras una entrega no se haya marcado como comunicada (panel
-//   "Comunicar a almacen"), no sale en este cuadro, aunque ya tenga fecha
-//   programada en el sistema: todavia no se le aviso a almacen.
-// - "Nueva fecha programada" solo se llena si la fecha vigente ya no es
-//   la misma que se comunico (se reprogramo despues de avisarle).
-// - "Status" es Ingreso si ya se registro una fecha real de llegada,
-//   Pendiente si todavia no llega nada.
-// - "Observaciones" anota la fecha real en que llego, para que quede el
-//   registro aunque el status ya diga "Ingreso".
-// Se filtra por el mes en que se comunico (no por la fecha vigente), para
-// que una entrega no se "mueva" de mes en el archivo solo porque se
-// reprogramo despues de avisada.
 export async function exportarCuadroAlmacen(mesClave) {
   const data = await fetchAll('programacion_oc',
-    'sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,fecha_real_ingreso,fecha_comunicada_almacen')
+    'sku,descripcion,cant_programada,cant_ingresada,ajuste_cantidad,fecha_programada_ingreso,proveedor,fecha_real_ingreso,estado_gestion')
 
-  const delMes = data
+  const pendientes = data
     .filter(r => {
-      const progEnMes = r.fecha_programada_ingreso && r.fecha_programada_ingreso.slice(0, 7) === mesClave
-      const comEnMes = r.fecha_comunicada_almacen && r.fecha_comunicada_almacen.slice(0, 7) === mesClave
-      return progEnMes || comEnMes
+      if (!r.fecha_programada_ingreso) return false
+      if (r.fecha_programada_ingreso.slice(0, 7) !== mesClave) return false
+      const prog = (r.cant_programada || 0) + (r.ajuste_cantidad || 0)
+      const saldo = Math.max(0, prog - (r.cant_ingresada || 0))
+      if (saldo <= 0) return false
+      if (CERRADAS.includes(r.estado_gestion)) return false
+      return true
     })
-    .map(r => ({
-      ...r,
-      fechaMostrar: r.fecha_comunicada_almacen || r.fecha_programada_ingreso,
-      reprogramada: r.fecha_comunicada_almacen && r.fecha_comunicada_almacen !== r.fecha_programada_ingreso
-        ? r.fecha_programada_ingreso : null,
-    }))
-    .sort((a, b) => (a.fechaMostrar || '').localeCompare(b.fechaMostrar || ''))
+    .map(r => {
+      const prog = (r.cant_programada || 0) + (r.ajuste_cantidad || 0)
+      const saldo = Math.max(0, prog - (r.cant_ingresada || 0))
+      return { ...r, saldo, progEfectivo: prog }
+    })
+    .sort((a, b) => (a.fecha_programada_ingreso || '').localeCompare(b.fecha_programada_ingreso || ''))
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet(nombreMes(mesClave).slice(0, 31))
 
-  ws.mergeCells('A1:J1')
+  ws.mergeCells('A1:I1')
   ws.getCell('A1').value = 'CUADRO DE INGRESOS DE MATERIAL DE EMPAQUE Y ENVASE'
   ws.getCell('A1').font = { bold: true, size: 13 }
 
@@ -84,7 +67,7 @@ export async function exportarCuadroAlmacen(mesClave) {
   ws.getCell('C4').value = 'Johany Cueto Malpartida'
 
   const filaHeader = 6
-  const columnas = ['CODIGO', 'PRODUCTO', 'CANTIDAD OC', 'CANTIDAD PROGRAMADO', 'UM', 'FECHA INGRESO ALMACEN', 'PROVEEDOR', 'NUEVA FECHA PROGRAMADA', 'STATUS', 'OBSERVACIONES']
+  const columnas = ['CODIGO', 'PRODUCTO', 'CANTIDAD PROGRAMADA', 'INGRESADO', 'SALDO PENDIENTE', 'UM', 'FECHA PROGRAMADA INGRESO', 'PROVEEDOR', 'OBSERVACIONES']
   const headerRow = ws.getRow(filaHeader)
   columnas.forEach((c, i) => {
     const cell = headerRow.getCell(i + 1)
@@ -93,28 +76,26 @@ export async function exportarCuadroAlmacen(mesClave) {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }
   })
 
-  delMes.forEach((r, i) => {
+  pendientes.forEach((r, i) => {
     const row = ws.getRow(filaHeader + 1 + i)
     row.values = [
       r.sku,
       r.descripcion,
-      r.cant_programada,
-      r.cant_programada,
+      r.progEfectivo,
+      r.cant_ingresada || 0,
+      r.saldo,
       'UNIDAD',
-      r.fechaMostrar ? new Date(r.fechaMostrar + 'T00:00:00') : null,
+      r.fecha_programada_ingreso ? new Date(r.fecha_programada_ingreso + 'T00:00:00') : null,
       r.proveedor,
-      r.reprogramada ? new Date(r.reprogramada + 'T00:00:00') : null,
-      r.fecha_real_ingreso ? 'Ingreso' : 'Pendiente',
-      r.fecha_real_ingreso ? `Fecha que ingreso: ${fdate(r.fecha_real_ingreso)}` : null,
+      r.fecha_real_ingreso ? `Ingreso parcial: ${fdate(r.fecha_real_ingreso)}` : null,
     ]
   })
 
   ws.columns = [
-    { width: 16 }, { width: 42 }, { width: 14 }, { width: 18 }, { width: 10 },
-    { width: 20 }, { width: 26 }, { width: 20 }, { width: 12 }, { width: 30 },
+    { width: 16 }, { width: 42 }, { width: 20 }, { width: 14 }, { width: 18 },
+    { width: 10 }, { width: 22 }, { width: 26 }, { width: 30 },
   ]
-  ws.getColumn(6).numFmt = 'dd/mm/yyyy'
-  ws.getColumn(8).numFmt = 'dd/mm/yyyy'
+  ws.getColumn(7).numFmt = 'dd/mm/yyyy'
   ws.views = [{ state: 'frozen', ySplit: filaHeader }]
 
   const buf = await wb.xlsx.writeBuffer()
