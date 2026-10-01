@@ -7,16 +7,17 @@ export default function ComunicarAlmacen({ rows, onClose }) {
   const [generando, setGenerando] = useState(false)
 
   const pendientesTodas = useMemo(() => rows
-    .filter(r => r.fecha_programada_ingreso && r.abierto)
-    .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso)), [rows])
+    .filter(r => (r.fecha_confirmada || r.fecha_programada_ingreso) && r.abierto)
+    .map(r => ({ ...r, fechaEfectiva: r.fecha_confirmada || r.fecha_programada_ingreso }))
+    .sort((a, b) => a.fechaEfectiva.localeCompare(b.fechaEfectiva)), [rows])
 
   const meses = useMemo(() => {
-    const claves = [...new Set(pendientesTodas.map(r => r.fecha_programada_ingreso.slice(0, 7)))].sort()
+    const claves = [...new Set(pendientesTodas.map(r => r.fechaEfectiva.slice(0, 7)))].sort()
     return claves.map(k => ({ valor: k, etiqueta: nombreMes(k) }))
   }, [pendientesTodas])
 
   const pendientes = useMemo(() => pendientesTodas
-    .filter(r => !mes || r.fecha_programada_ingreso.slice(0, 7) === mes), [pendientesTodas, mes])
+    .filter(r => !mes || r.fechaEfectiva.slice(0, 7) === mes), [pendientesTodas, mes])
 
   async function generarCuadro() {
     setGenerando(true)
@@ -60,7 +61,7 @@ export default function ComunicarAlmacen({ rows, onClose }) {
                 <thead>
                   <tr>
                     <th>SKU</th><th>Material</th><th>Proveedor</th>
-                    <th>Programado</th><th>Ingresado</th><th>Saldo</th><th>F. programada</th>
+                    <th>Programado</th><th>Ingresado</th><th>Saldo</th><th>F. ingreso</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -72,7 +73,7 @@ export default function ComunicarAlmacen({ rows, onClose }) {
                       <td style={{ textAlign: 'right' }}>{fmt(r.progEfectivo || r.cant_programada)}</td>
                       <td style={{ textAlign: 'right' }}>{fmt(r.cant_ingresada || 0)}</td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{fmt(r.saldo_pendiente)}</td>
-                      <td>{fdate(r.fecha_programada_ingreso)}</td>
+                      <td>{fdate(r.fechaEfectiva)}{r.fecha_confirmada ? ' ✓' : ''}</td>
                     </tr>
                   ))}
                 </tbody>

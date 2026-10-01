@@ -32,12 +32,13 @@ export function nombreMes(clave) {
 
 export async function exportarCuadroAlmacen(mesClave) {
   const data = await fetchAll('programacion_oc',
-    'sku,descripcion,cant_programada,cant_ingresada,ajuste_cantidad,fecha_programada_ingreso,proveedor,fecha_real_ingreso,estado_gestion')
+    'sku,descripcion,cant_programada,cant_ingresada,ajuste_cantidad,fecha_programada_ingreso,fecha_confirmada,proveedor,fecha_real_ingreso,estado_gestion')
 
   const pendientes = data
     .filter(r => {
-      if (!r.fecha_programada_ingreso) return false
-      if (r.fecha_programada_ingreso.slice(0, 7) !== mesClave) return false
+      const fechaEfectiva = r.fecha_confirmada || r.fecha_programada_ingreso
+      if (!fechaEfectiva) return false
+      if (fechaEfectiva.slice(0, 7) !== mesClave) return false
       const prog = (r.cant_programada || 0) + (r.ajuste_cantidad || 0)
       const saldo = Math.max(0, prog - (r.cant_ingresada || 0))
       if (saldo <= 0) return false
@@ -47,9 +48,10 @@ export async function exportarCuadroAlmacen(mesClave) {
     .map(r => {
       const prog = (r.cant_programada || 0) + (r.ajuste_cantidad || 0)
       const saldo = Math.max(0, prog - (r.cant_ingresada || 0))
-      return { ...r, saldo, progEfectivo: prog }
+      const fechaEfectiva = r.fecha_confirmada || r.fecha_programada_ingreso
+      return { ...r, saldo, progEfectivo: prog, fechaEfectiva }
     })
-    .sort((a, b) => (a.fecha_programada_ingreso || '').localeCompare(b.fecha_programada_ingreso || ''))
+    .sort((a, b) => (a.fechaEfectiva || '').localeCompare(b.fechaEfectiva || ''))
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet(nombreMes(mesClave).slice(0, 31))
@@ -85,9 +87,10 @@ export async function exportarCuadroAlmacen(mesClave) {
       r.cant_ingresada || 0,
       r.saldo,
       'UNIDAD',
-      r.fecha_programada_ingreso ? new Date(r.fecha_programada_ingreso + 'T00:00:00') : null,
+      r.fechaEfectiva ? new Date(r.fechaEfectiva + 'T00:00:00') : null,
       r.proveedor,
-      r.fecha_real_ingreso ? `Ingreso parcial: ${fdate(r.fecha_real_ingreso)}` : null,
+      r.fecha_real_ingreso ? `Ingreso parcial: ${fdate(r.fecha_real_ingreso)}`
+        : r.fecha_confirmada ? 'Fecha confirmada por proveedor' : null,
     ]
   })
 
