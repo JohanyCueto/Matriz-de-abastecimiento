@@ -67,7 +67,7 @@ export function enrich(r) {
   const saldo = Math.max(0, progEfectivo - (r.cant_ingresada || 0))
   const abierto = saldo > 0 && !CERRADAS.includes(r.estado_gestion)
   const tol = CERRADAS.includes(r.estado_gestion) && saldo > 0
-  const dd = days(r.fecha_programada_ingreso)
+  const dd = days(r.fecha_confirmada || r.fecha_programada_ingreso)
   const avance = progEfectivo ? Math.min(1, (r.cant_ingresada || 0) / progEfectivo) : 0
   const desv = progEfectivo ? ((r.cant_ingresada || 0) - progEfectivo) / progEfectivo : 0
   const dentroTolerancia = tol && Math.abs(desv) <= TOLERANCIA_MARGEN

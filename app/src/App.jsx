@@ -204,10 +204,13 @@ export default function App() {
       case 'cant_ingresada': return fmt(r.cant_ingresada)
       case 'saldo_pendiente': return r.saldo_pendiente > 0 ? <b style={{ fontWeight: 500 }}>{fmt(r.saldo_pendiente)}</b> : <span className="dim">0</span>
       case 'avance': return <><span className="pbar"><i style={{ width: `${(r.avance * 100).toFixed(0)}%` }} /></span><span className="pct">{(r.avance * 100).toFixed(0)}%</span></>
-      case 'fecha_programada_ingreso': return <>
-        <span className="mono">{fdate(r.fecha_programada_ingreso)}</span>
-        {r.hist.length > 0 && <span className="rep" title={`Reprogramada ${r.hist.length} ${r.hist.length === 1 ? 'vez' : 'veces'}. Fecha original ${fdate(r.fprog0)}`}>R{r.hist.length > 1 ? r.hist.length : ''}</span>}
-      </>
+      case 'fecha_programada_ingreso': {
+        const fEfectiva = r.fecha_confirmada || r.fecha_programada_ingreso
+        return <>
+          <span className="mono">{fdate(fEfectiva)}</span>
+          {r.hist.length > 0 && <span className="rep" title={`Reprogramada ${r.hist.length} ${r.hist.length === 1 ? 'vez' : 'veces'}. Fecha original ${fdate(r.fprog0)}`}>R{r.hist.length > 1 ? r.hist.length : ''}</span>}
+        </>
+      }
       case 'estado_confirmacion':
         if (!r.estado_confirmacion) return <span className="dim">-</span>
         return <span className={`tag ${CONF_TAG[r.estado_confirmacion] || 't-gry'}`}>{r.estado_confirmacion === 'Reprogramada por proveedor' ? 'Reprog. prov.' : r.estado_confirmacion}</span>
