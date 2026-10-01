@@ -27,14 +27,6 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
   const porComunicar = useMemo(() => porComunicarTodas
     .filter(r => !mes || r.fecha_programada_ingreso.slice(0, 7) === mes), [porComunicarTodas, mes])
 
-  // Ya comunicadas antes, pero la fecha vigente se movio desde entonces
-  // (reprogramacion). Es solo informativo: el Cuadro Almacen ya las
-  // muestra solas con su "Nueva fecha programada", no hace falta marcarlas.
-  const conCambio = useMemo(() => rows
-    .filter(r => r.fecha_comunicada_almacen && r.fecha_programada_ingreso && r.fecha_comunicada_almacen !== r.fecha_programada_ingreso)
-    .filter(r => !mes || r.fecha_programada_ingreso.slice(0, 7) === mes)
-    .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso)), [rows, mes])
-
   function toggle(id) {
     setSeleccion(prev => {
       const next = new Set(prev)
@@ -174,28 +166,6 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
             </div>
           )}
 
-          {conCambio.length > 0 && (
-            <>
-              <div className="hint" style={{ margin: '18px 0 10px' }}>
-                Ya comunicadas antes, pero su fecha se movio desde entonces (el Cuadro Almacen ya las muestra con "Nueva fecha programada", no hace falta hacer nada aqui):
-              </div>
-              <div className="mdl-tbl">
-                <table>
-                  <thead><tr><th>SKU</th><th>Material</th><th>Fecha avisada</th><th>Fecha nueva</th></tr></thead>
-                  <tbody>
-                    {conCambio.map(r => (
-                      <tr key={r.id_entrega}>
-                        <td>{r.sku}</td>
-                        <td>{r.descripcion}</td>
-                        <td className="dim">{fdate(r.fecha_comunicada_almacen)}</td>
-                        <td>{fdate(r.fecha_programada_ingreso)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
         </div>
       </div>
     </div>
