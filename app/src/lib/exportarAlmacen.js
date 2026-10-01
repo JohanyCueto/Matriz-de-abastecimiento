@@ -55,14 +55,18 @@ export async function exportarCuadroAlmacen(mesClave) {
     'sku,descripcion,cant_programada,fecha_programada_ingreso,proveedor,fecha_real_ingreso,fecha_comunicada_almacen')
 
   const delMes = data
-    .filter(r => r.fecha_programada_ingreso && r.fecha_programada_ingreso.slice(0, 7) === mesClave)
+    .filter(r => {
+      const progEnMes = r.fecha_programada_ingreso && r.fecha_programada_ingreso.slice(0, 7) === mesClave
+      const comEnMes = r.fecha_comunicada_almacen && r.fecha_comunicada_almacen.slice(0, 7) === mesClave
+      return progEnMes || comEnMes
+    })
     .map(r => ({
       ...r,
       fechaMostrar: r.fecha_comunicada_almacen || r.fecha_programada_ingreso,
       reprogramada: r.fecha_comunicada_almacen && r.fecha_comunicada_almacen !== r.fecha_programada_ingreso
         ? r.fecha_programada_ingreso : null,
     }))
-    .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso))
+    .sort((a, b) => (a.fechaMostrar || '').localeCompare(b.fechaMostrar || ''))
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet(nombreMes(mesClave).slice(0, 31))
