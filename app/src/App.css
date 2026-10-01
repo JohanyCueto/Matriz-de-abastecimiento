@@ -254,3 +254,15 @@ tbody tr.sel{background:#f2f5f9}
 .oi-step.done .oi-step-label{color:var(--ink3)}
 .oi-step-body{padding:6px 0 12px 0}
 .oi-check{display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0;cursor:pointer}
+
+/* --- OI: celda visual de etapa en la tabla --- */
+.oi-etapa-cell{display:flex;flex-direction:column;gap:4px;min-width:200px}
+.oi-etapa-top{display:flex;align-items:center;gap:5px}
+.oi-etapa-icon{font-size:14px;line-height:1}
+.oi-etapa-name{font-size:12px;font-weight:600;color:var(--ink)}
+.oi-etapa-num{margin-left:auto;font-size:10px;color:var(--ink3);font-weight:600;background:var(--bg);padding:1px 6px;border-radius:8px}
+.oi-etapa-bar{display:flex;gap:2px;height:6px;border-radius:3px;overflow:hidden}
+.oi-seg{flex:1;border-radius:3px;background:var(--line);transition:background .2s}
+.oi-seg.done{background:var(--blu)}
+.oi-seg.active{animation:oi-pulse 1.5s ease-in-out infinite}
+@keyframes oi-pulse{0%,100%{opacity:.35}50%{opacity:.7}}

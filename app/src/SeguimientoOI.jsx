@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fmt, fdate } from './lib/derive'
-import { cargarOI, etapaLabel, calcularEtapa } from './lib/seguimientoOI'
+import { cargarOI, ETAPAS, etapaLabel, calcularEtapa } from './lib/seguimientoOI'
 import PanelOI from './PanelOI'
 import { useSesion } from './lib/auth'
 
-const ETAPA_TAG = {
-  1: 't-amb', 2: 't-amb', 3: 't-blu', 4: 't-blu',
-  5: 't-amb', 6: 't-red', 7: 't-amb', 8: 't-amb', 9: 't-grn',
+const ETAPA_SHORT = {
+  1: 'Producción', 2: 'Recojo', 3: 'En tránsito', 4: 'Documentos',
+  5: 'Numeración', 6: 'Pago', 7: 'Desaduanaje', 8: 'Ingreso', 9: 'Completado',
+}
+
+const ETAPA_ICON = {
+  1: '🏭', 2: '🚛', 3: '🚢', 4: '📄', 5: '📋', 6: '💰', 7: '🏛', 8: '📦', 9: '✅',
 }
 
 const COLS_OI = [
-  { k: 'etapa', l: 'Etapa', w: '170px' },
+  { k: 'etapa', l: 'Etapa', w: '240px' },
   { k: 'oc', l: 'OI' },
   { k: 'sku', l: 'SKU' },
   { k: 'descripcion', l: 'Material' },
@@ -73,15 +77,15 @@ export default function SeguimientoOI() {
     for (let i = 1; i <= 9; i++) byEtapa[i] = 0
     rows.forEach(r => { byEtapa[r.etapa] = (byEtapa[r.etapa] || 0) + 1 })
     return [
-      { id: '', lb: 'Total OI', vl: rows.length, cl: '' },
-      { id: '1', lb: 'Culminación', vl: byEtapa[1], cl: byEtapa[1] > 0 ? 'a' : '' },
-      { id: '3', lb: 'Despacho', vl: byEtapa[2] + byEtapa[3], cl: '' },
-      { id: '4', lb: 'Documentos', vl: byEtapa[4], cl: '' },
-      { id: '5', lb: 'Numeración', vl: byEtapa[5], cl: '' },
-      { id: '6', lb: 'Pago', vl: byEtapa[6], cl: byEtapa[6] > 0 ? 'r' : '' },
-      { id: '7', lb: 'Desaduanaje', vl: byEtapa[7], cl: byEtapa[7] > 0 ? 'a' : '' },
-      { id: '8', lb: 'Ingreso', vl: byEtapa[8], cl: '' },
-      { id: '9', lb: 'Completadas', vl: byEtapa[9], cl: 'g' },
+      { id: '', lb: 'Total OI', vl: rows.length, cl: '', icon: '📊' },
+      { id: '1', lb: 'Producción', vl: byEtapa[1], cl: byEtapa[1] > 0 ? 'a' : '', icon: '🏭' },
+      { id: '3', lb: 'En tránsito', vl: byEtapa[2] + byEtapa[3], cl: '', icon: '🚢' },
+      { id: '4', lb: 'Documentos', vl: byEtapa[4], cl: '', icon: '📄' },
+      { id: '5', lb: 'Numeración', vl: byEtapa[5], cl: '', icon: '📋' },
+      { id: '6', lb: 'Pago', vl: byEtapa[6], cl: byEtapa[6] > 0 ? 'r' : '', icon: '💰' },
+      { id: '7', lb: 'Desaduanaje', vl: byEtapa[7], cl: byEtapa[7] > 0 ? 'a' : '', icon: '🏛' },
+      { id: '8', lb: 'Ingreso', vl: byEtapa[8], cl: '', icon: '📦' },
+      { id: '9', lb: 'Completadas', vl: byEtapa[9], cl: 'g', icon: '✅' },
     ]
   }, [rows])
 
@@ -129,7 +133,34 @@ export default function SeguimientoOI() {
 
   function celda(r, k) {
     switch (k) {
-      case 'etapa': return <span className={`tag ${ETAPA_TAG[r.etapa] || 't-gry'}`}>{r.etapaLabel}</span>
+      case 'etapa': {
+        const total = 8
+        const done = Math.min(r.etapa - 1, total)
+        const pct = r.etapa === 9 ? 100 : Math.round((done / total) * 100)
+        const color = r.etapa === 9 ? 'var(--grn)' : r.etapa >= 6 ? 'var(--amb)' : 'var(--blu)'
+        return (
+          <div className="oi-etapa-cell">
+            <div className="oi-etapa-top">
+              <span className="oi-etapa-icon">{ETAPA_ICON[r.etapa]}</span>
+              <span className="oi-etapa-name">{ETAPA_SHORT[r.etapa]}</span>
+              <span className="oi-etapa-num">{r.etapa === 9 ? '✓' : `${r.etapa}/8`}</span>
+            </div>
+            <div className="oi-etapa-bar">
+              {Array.from({ length: total }, (_, i) => (
+                <div
+                  key={i}
+                  className={`oi-seg ${i < done ? 'done' : ''} ${i === done && r.etapa <= total ? 'active' : ''}`}
+                  style={{
+                    background: i < done ? color : i === done && r.etapa <= total ? color : undefined,
+                    opacity: i === done && r.etapa <= total ? 0.4 : undefined,
+                  }}
+                  title={ETAPAS[i]?.l || 'Completado'}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      }
       case 'oc': return <span className="mono">{r.oc}</span>
       case 'sku': return <span className="mono">{r.sku}</span>
       case 'descripcion': return <div className="dsc">{r.descripcion || ''}</div>
@@ -164,7 +195,7 @@ export default function SeguimientoOI() {
             {kpis.map(k => (
               <div key={k.lb} className={`kpi ${k.cl} ${fEtapa === k.id && k.id ? 'on' : ''}`}
                 onClick={() => { if (!k.id) return; setFEtapa(prev => prev === k.id ? '' : k.id) }}>
-                <div className="lb">{k.lb}</div>
+                <div className="lb">{k.icon} {k.lb}</div>
                 <div className="vl">{fmt(k.vl)}</div>
               </div>
             ))}
