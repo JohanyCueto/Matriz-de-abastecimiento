@@ -16,7 +16,7 @@ export default function ComunicarAlmacen({ rows, onClose, onActualizado }) {
   // Nunca comunicadas a almacen (fecha_comunicada_almacen vacia): mientras
   // no se marquen aqui, el Cuadro Almacen no las muestra.
   const porComunicarTodas = useMemo(() => rows
-    .filter(r => !r.fecha_comunicada_almacen && r.fecha_programada_ingreso)
+    .filter(r => !r.fecha_comunicada_almacen && r.fecha_programada_ingreso && r.abierto)
     .sort((a, b) => a.fecha_programada_ingreso.localeCompare(b.fecha_programada_ingreso)), [rows])
 
   const meses = useMemo(() => {
