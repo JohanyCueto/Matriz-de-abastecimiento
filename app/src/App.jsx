@@ -96,27 +96,29 @@ export default function App() {
     setRows(prev => withEntregas(prev.map(r => r.id_entrega === id ? enrich({ ...r, ...patch }) : r).map(r => ({ ...r }))))
   }
 
-  const proveedores = useMemo(() => [...new Set(rows.map(r => r.proveedor).filter(Boolean))].sort(), [rows])
-  const compradores = useMemo(() => [...new Set(rows.map(r => r.comprador).filter(Boolean))].sort(), [rows])
+  const rowsOC = useMemo(() => rows.filter(r => r.origen !== 'Importado'), [rows])
+
+  const proveedores = useMemo(() => [...new Set(rowsOC.map(r => r.proveedor).filter(Boolean))].sort(), [rowsOC])
+  const compradores = useMemo(() => [...new Set(rowsOC.map(r => r.comprador).filter(Boolean))].sort(), [rowsOC])
   const meses = useMemo(() => {
-    const claves = [...new Set(rows.map(r => r.fecha_programada_ingreso?.slice(0, 7)).filter(Boolean))].sort()
+    const claves = [...new Set(rowsOC.map(r => r.fecha_programada_ingreso?.slice(0, 7)).filter(Boolean))].sort()
     return claves.map(k => ({ valor: k, etiqueta: nombreMes(k) }))
-  }, [rows])
+  }, [rowsOC])
 
   const kpis = useMemo(() => {
-    const ab = rows.filter(r => r.abierto)
+    const ab = rowsOC.filter(r => r.abierto)
     const at = ab.filter(r => r.sem2 === 'atrasado')
     const pl = ab.filter(r => r.sem2 === 'porllegar')
     const sf = ab.filter(r => r.sem2 === 'sinfecha')
     const vs = ab.filter(r => r.moneda === 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const vd = ab.filter(r => r.moneda !== 'SOLES').reduce((a, r) => a + (r.valor_pendiente || 0), 0)
     const pc = ab.filter(r => r.estado_confirmacion === 'Pendiente').length
-    const rp = rows.filter(r => r.hist.length).length
-    const tl = rows.filter(r => r.dentroTolerancia).length
-    const fd = rows.filter(r => r.fueraTolerancia).length
-    const cc = rows.length - ab.length - tl - fd
+    const rp = rowsOC.filter(r => r.hist.length).length
+    const tl = rowsOC.filter(r => r.dentroTolerancia).length
+    const fd = rowsOC.filter(r => r.fueraTolerancia).length
+    const cc = rowsOC.length - ab.length - tl - fd
     return [
-      { id: '', lb: 'Lineas totales', vl: rows.length, ft: 'entregas programadas', cl: '' },
+      { id: '', lb: 'Lineas totales', vl: rowsOC.length, ft: 'entregas programadas', cl: '' },
       { id: 'abierto', lb: 'Abiertas', vl: ab.length, ft: 'con saldo pendiente', cl: '' },
       { id: 'atrasado', lb: 'Atrasadas', vl: at.length, ft: 'pasaron su fecha', cl: 'r' },
       { id: 'sinfecha', lb: 'Sin fecha programada', vl: sf.length, ft: 'necesitan fecha', cl: 'a' },
@@ -127,11 +129,11 @@ export default function App() {
       { id: 'cerrado', lb: 'Cerradas', vl: cc + tl + fd, ft: `${fmt(cc)} exactas, ${fmt(tl)} en tolerancia, ${fmt(fd)} fuera de tolerancia`, cl: 'g' },
       { id: 'valor', lb: 'Valor pendiente', vl: `S/ ${fmt(vs)}`, ft: `mas US$ ${fmt(vd)}`, cl: '' },
     ]
-  }, [rows])
+  }, [rowsOC])
 
   const filtradas = useMemo(() => {
     const qq = q.trim().toLowerCase()
-    let out = rows.filter(r => {
+    let out = rowsOC.filter(r => {
       if (qq) {
         const busca = `${r.oc} ${r.sku} ${r.descripcion || ''} ${r.proveedor || ''} ${r.comprador || ''}`.toLowerCase()
         if (!busca.includes(qq)) return false
@@ -162,9 +164,9 @@ export default function App() {
       return (x > y ? 1 : x < y ? -1 : 0) * sortD
     })
     return out
-  }, [rows, q, fEst, fGes, fProv, fComp, fMes, fConf, quick, soloTol, sortK, sortD])
+  }, [rowsOC, q, fEst, fGes, fProv, fComp, fMes, fConf, quick, soloTol, sortK, sortD])
 
-  const selected = filtradas.find(r => r.id_entrega === selectedId) || rows.find(r => r.id_entrega === selectedId)
+  const selected = filtradas.find(r => r.id_entrega === selectedId) || rowsOC.find(r => r.id_entrega === selectedId)
 
   function toggleSort(k) {
     if (sortK === k) setSortD(d => -d)
@@ -341,11 +343,11 @@ export default function App() {
       )}
 
       {mostrarComunicar && (
-        <ComunicarAlmacen rows={rows} onClose={() => setMostrarComunicar(false)} onActualizado={cargar} />
+        <ComunicarAlmacen rows={rowsOC} onClose={() => setMostrarComunicar(false)} onActualizado={cargar} />
       )}
 
       {mostrarEnviar && (
-        <EnviarRecordatorios rows={rows} esEditor={esEditor} onClose={() => setMostrarEnviar(false)} />
+        <EnviarRecordatorios rows={rowsOC} esEditor={esEditor} onClose={() => setMostrarEnviar(false)} />
       )}
     </div>
   )
