@@ -280,17 +280,18 @@ export async function obtenerMaterialesDeSnapshot(snapshotId) {
 export async function obtenerOcPorSku(codigos) {
   const m = new Map()
   if (!codigos.length) return m
-  const data = await fetchAll('programacion_oc', 'oc,sku,saldo_pendiente,fecha_programada_ingreso,estado_gestion', q => q.in('sku', codigos))
+  const data = await fetchAll('programacion_oc', 'oc,sku,saldo_pendiente,fecha_programada_ingreso,fecha_confirmada,estado_gestion', q => q.in('sku', codigos))
   for (const row of data) {
     if (!m.has(row.sku)) m.set(row.sku, { saldoPendiente: 0, fechaProgramada: null, entregas: [] })
     const acc = m.get(row.sku)
     const saldo = row.saldo_pendiente || 0
     if (saldo <= 0 || CERRADAS.includes(row.estado_gestion)) continue
     acc.saldoPendiente += saldo
-    acc.entregas.push({ oc: row.oc, saldo, fecha: row.fecha_programada_ingreso })
-    if (row.fecha_programada_ingreso) {
-      if (!acc.fechaProgramada || row.fecha_programada_ingreso < acc.fechaProgramada) {
-        acc.fechaProgramada = row.fecha_programada_ingreso
+    const fechaEfectiva = row.fecha_confirmada || row.fecha_programada_ingreso
+    acc.entregas.push({ oc: row.oc, saldo, fecha: fechaEfectiva })
+    if (fechaEfectiva) {
+      if (!acc.fechaProgramada || fechaEfectiva < acc.fechaProgramada) {
+        acc.fechaProgramada = fechaEfectiva
       }
     }
   }

@@ -197,6 +197,7 @@ export default function Explosion() {
                     <th>Mes fabricación</th>
                     <th>Fecha requerida</th>
                     <th>Fecha programada</th>
+                    <th className="num">Cobertura</th>
                     <th>Estado</th>
                   </tr>
                 </thead>
@@ -238,12 +239,17 @@ export default function Explosion() {
                         <td className="nw">{f.mesFabricacionProximo ? mesLabel(f.mesFabricacionProximo) : <span className="dim">-</span>}</td>
                         <td className="mono">{f.fechaRequeridaIngreso ? fdate(f.fechaRequeridaIngreso) : <span className="dim">-</span>}</td>
                         <td className="mono">{f.fechaEntregaProgramada ? fdate(f.fechaEntregaProgramada) : <span className="dim">-</span>}</td>
+                        <td className="num">
+                          {f.mesesCubiertos != null
+                            ? <span style={{ color: f.mesesCubiertos >= 2.5 ? 'var(--grn)' : f.mesesCubiertos >= 1 ? 'var(--amb)' : 'var(--red)', fontWeight: 500 }}>{f.mesesCubiertos} m</span>
+                            : <span className="dim">-</span>}
+                        </td>
                         <td><span className={`tag ${ESTADO_TAG[f.estadoAbastecimiento]}`}>{ESTADO_LABEL[f.estadoAbastecimiento]}</span></td>
                       </tr>
                       {expandido === f.codigo && (
                         <tr>
                           <td></td>
-                          <td colSpan={18}>
+                          <td colSpan={19}>
                             <table className="expl-detalle">
                               <thead>
                                 <tr><th>Mes</th><th className="num">Explosión anterior</th><th className="num">Nueva explosión</th><th className="num">Variación</th></tr>

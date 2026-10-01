@@ -87,27 +87,40 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
     let estadoAbastecimiento
     if (faltanteReal <= 0) {
       estadoAbastecimiento = 'cubierto'
+    } else if (oc.saldoPendiente > 0 && oc.fechaProgramada) {
+      // Hay OC pendiente cubriendo parte del consumo: clasificar por
+      // timing, sin importar si la fecha requerida ya paso. Antes se
+      // marcaba "quiebre" cuando la fecha pasaba, pero con una OC de
+      // 850,000 unidades cubriendo el 96% del consumo no tiene sentido
+      // llamarlo ruptura.
+      if (!f.fechaRequeridaIngreso) {
+        estadoAbastecimiento = 'sin_dato'
+      } else {
+        const diasDiferencia = Math.round(
+          (new Date(oc.fechaProgramada) - new Date(f.fechaRequeridaIngreso)) / 86400000
+        )
+        if (diasDiferencia <= 0) estadoAbastecimiento = 'a_tiempo'
+        else if (diasDiferencia <= MARGEN_AJUSTADO_DIAS) estadoAbastecimiento = 'ajustado'
+        else estadoAbastecimiento = 'en_riesgo'
+      }
     } else if (f.fechaRequeridaIngreso && new Date(f.fechaRequeridaIngreso) < new Date()) {
-      // Ya paso la fecha en la que se necesitaba el material para fabricar
-      // y todavia falta -- esto ya no es un riesgo a futuro (como
-      // "en_riesgo", que compara contra una OC que todavia va a llegar):
-      // es una ruptura de stock real, haya o no una OC en camino.
       estadoAbastecimiento = 'quiebre'
-    } else if (!oc.fechaProgramada) {
+    } else if (!oc.fechaProgramada && oc.saldoPendiente <= 0) {
       estadoAbastecimiento = 'sin_oc'
     } else if (!f.fechaRequeridaIngreso) {
-      // Hay OC pendiente, pero no se pudo calcular la fecha requerida
-      // (el material no aparecio en EXPLOSION_DETALLADA) -- no se puede
-      // clasificar el riesgo con certeza.
       estadoAbastecimiento = 'sin_dato'
     } else {
-      const diasDiferencia = Math.round(
-        (new Date(oc.fechaProgramada) - new Date(f.fechaRequeridaIngreso)) / 86400000
-      )
-      if (diasDiferencia <= 0) estadoAbastecimiento = 'a_tiempo'
-      else if (diasDiferencia <= MARGEN_AJUSTADO_DIAS) estadoAbastecimiento = 'ajustado'
-      else estadoAbastecimiento = 'en_riesgo'
+      estadoAbastecimiento = 'en_riesgo'
     }
+
+    // Meses de cobertura: cuantos meses de produccion puede cubrir con
+    // lo que tiene (stock) mas lo que viene (OC pendiente).
+    const consumoMensual = f.meses.length
+      ? f.meses.reduce((a, m) => a + (m.actual || 0), 0) / f.meses.length
+      : 0
+    const mesesCubiertos = consumoMensual > 0
+      ? Math.round(((stock + oc.saldoPendiente) / consumoMensual) * 10) / 10
+      : null
 
     return {
       ...f,
@@ -123,6 +136,8 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
       faltanteReal,
       compraSugerida,
       estadoAbastecimiento,
+      mesesCubiertos,
+      consumoMensual,
     }
   })
 }
