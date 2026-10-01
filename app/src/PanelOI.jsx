@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { supabase } from './lib/supabaseClient'
 import { fmt, fdate, fmtM } from './lib/derive'
 import { ETAPAS, etapasVisibles, calcularEtapa, contarDocs, guardarSeguimientoOI } from './lib/seguimientoOI'
 
@@ -43,6 +44,8 @@ export default function PanelOI({ row, esEditor, onClose, onSaved }) {
     fecha_ingreso_almacen: s.fecha_ingreso_almacen || '',
     observaciones_ingreso: s.observaciones_ingreso || '',
   })
+  const [fechaProg, setFechaProg] = useState(row.fecha_programada_ingreso || '')
+  const [diasPostEta, setDiasPostEta] = useState(7)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expandido, setExpandido] = useState(null)
@@ -50,6 +53,14 @@ export default function PanelOI({ row, esEditor, onClose, onSaved }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const etapaActual = calcularEtapa(form)
   const visibles = etapasVisibles(form.incoterm)
+
+  function calcularDesdeEta() {
+    if (!form.eta) return
+    const d = new Date(form.eta + 'T00:00:00')
+    d.setDate(d.getDate() + diasPostEta)
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    setFechaProg(iso)
+  }
 
   async function guardar() {
     setSaving(true)
@@ -64,7 +75,14 @@ export default function PanelOI({ row, esEditor, onClose, onSaved }) {
     }
     try {
       await guardarSeguimientoOI(row.id_entrega, patch)
-      onSaved(patch)
+      const fechaProgChanged = fechaProg && fechaProg !== row.fecha_programada_ingreso
+      if (fechaProgChanged) {
+        const { error } = await supabase.from('programacion_oc')
+          .update({ fecha_programada_ingreso: fechaProg })
+          .eq('id_entrega', row.id_entrega)
+        if (error) throw error
+      }
+      onSaved(patch, fechaProgChanged ? fechaProg : null)
       setSaved(true)
       setTimeout(() => setSaved(false), 1400)
     } catch (err) {
@@ -104,7 +122,25 @@ export default function PanelOI({ row, esEditor, onClose, onSaved }) {
             <div className="kv"><span>Cantidad programada</span><b>{fmt(row.cant_programada)}</b></div>
             <div className="kv"><span>Cantidad ingresada</span><b>{fmt(row.cant_ingresada)}</b></div>
             <div className="kv"><span>Saldo pendiente</span><b style={{ color: row.saldo_pendiente > 0 ? 'var(--red)' : 'var(--ink3)' }}>{fmt(row.saldo_pendiente)}</b></div>
-            <div className="kv"><span>Fecha programada</span><b>{fdate(row.fecha_programada_ingreso)}</b></div>
+            {esEditor ? (
+              <div className="fld">
+                <label>Fecha programada ingreso</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="date" value={fechaProg} onChange={e => setFechaProg(e.target.value)} />
+                  {form.eta && (
+                    <>
+                      <span className="hint" style={{ margin: 0, whiteSpace: 'nowrap' }}>ETA +</span>
+                      <input type="number" value={diasPostEta} onChange={e => setDiasPostEta(Number(e.target.value) || 0)} style={{ width: 50 }} min={0} />
+                      <span className="hint" style={{ margin: 0 }}>d</span>
+                      <button type="button" className="btn" onClick={calcularDesdeEta} style={{ whiteSpace: 'nowrap' }}>Calcular</button>
+                    </>
+                  )}
+                </div>
+                {form.eta && <div className="hint">ETA: {fdate(form.eta)}{fechaProg !== row.fecha_programada_ingreso ? ' — fecha modificada, se guardará al presionar Guardar' : ''}</div>}
+              </div>
+            ) : (
+              <div className="kv"><span>Fecha programada</span><b>{fdate(row.fecha_programada_ingreso)}</b></div>
+            )}
             {row.fecha_real_ingreso && <div className="kv"><span>Fecha real de ingreso</span><b style={{ color: 'var(--grn)' }}>{fdate(row.fecha_real_ingreso)}</b></div>}
             <div className="kv"><span>Precio unitario</span><b>{fmtM(row.precio_unitario, row.moneda)}</b></div>
             <div className="kv"><span>Valor entrega</span><b>{fmtM(row.valor_entrega, row.moneda)}</b></div>

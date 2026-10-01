@@ -56,12 +56,10 @@ export async function exportarExcel() {
         // de si la linea sigue abierta, igual que en la app. Si ya se
         // cerro (aunque sea con tolerancia y le falte un poco), ya no
         // cuenta como pendiente.
-        return ((r.saldo_pendiente || 0) > 0 && r.estado_gestion !== 'Cerrado') ? 'Pendiente' : 'Completo'
+        return ((r.saldo_pendiente || 0) > 0 && !['Cerrado', 'Orden Anulada'].includes(r.estado_gestion)) ? 'Pendiente' : 'Completo'
       case 'estado_gestion': {
-        // Misma correccion que en la app: si ya no hay saldo (o ya esta
-        // cerrada), se ve Cerrado; si se paso la fecha, Atrasado.
-        const abierto = (r.saldo_pendiente || 0) > 0 && r.estado_gestion !== 'Cerrado'
-        if (!abierto) return 'Cerrado'
+        const abierto = (r.saldo_pendiente || 0) > 0 && !['Cerrado', 'Orden Anulada'].includes(r.estado_gestion)
+        if (!abierto) return r.estado_gestion === 'Orden Anulada' ? 'Orden Anulada' : 'Cerrado'
         if (r.fecha_programada_ingreso) {
           const dd = Math.round((new Date(r.fecha_programada_ingreso + 'T00:00:00') - new Date()) / 864e5)
           if (dd < 0) return 'Atrasado'

@@ -17,7 +17,7 @@ export const nombreMes = clave => {
 
 export const days = s => s ? Math.round((new Date(s + 'T00:00:00') - new Date()) / 864e5) : null
 
-export const CERRADAS = ['Cerrado']
+export const CERRADAS = ['Cerrado', 'Orden Anulada']
 
 // Margen aceptado al cerrar una entrega con falta o demasia frente a lo
 // programado. Dentro de este margen se acepta como cierre normal; mas alla,
@@ -35,7 +35,7 @@ export const SEM = {
   cerrado: { c: 'var(--gry)', t: 't-gry', l: 'Cerrado' },
 }
 export const EST_TAG = { Completo: 't-grn', Pendiente: 't-blu' }
-export const GES_TAG = { 'En seguimiento': 't-blu', Reprogramado: 't-amb', Atrasado: 't-red', Cerrado: 't-gry' }
+export const GES_TAG = { 'En seguimiento': 't-blu', Reprogramado: 't-amb', Atrasado: 't-red', Cerrado: 't-gry', 'Orden Anulada': 't-red' }
 export const CONF_TAG = { Pendiente: 't-amb', Confirmada: 't-grn', 'Reprogramada por proveedor': 't-red' }
 
 export const MOTIVOS = ['', 'Falta de stock proveedor', 'Demora producción proveedor', 'Demora logística / despacho', 'Ingreso parcial', 'Reprogramación interna']
@@ -43,8 +43,8 @@ export const RESP = ['', 'Compras', 'Proveedor', 'Planeamiento', 'Almacén', 'Ca
 export const G_ACT = ['En seguimiento', 'Reprogramado', 'Atrasado']
 
 export function gestOpts(r) {
-  if (r.estado_ingreso === 'Completo') return ['Cerrado']
-  return G_ACT.concat(['Cerrado'])
+  if (r.estado_ingreso === 'Completo') return ['Cerrado', 'Orden Anulada']
+  return G_ACT.concat(['Cerrado', 'Orden Anulada'])
 }
 
 // Le agrega a cada fila el numero de entrega y el total de entregas de su
@@ -90,7 +90,8 @@ export function enrich(r) {
   // pendiente (o alguien la cerro a mano), se ve Cerrado; si se paso la
   // fecha y sigue con saldo, Atrasado; si no, se respeta lo que haya
   // dejado la gente (Reprogramado, etc.) o "En seguimiento" por defecto.
-  const estadoGestion = !abierto ? 'Cerrado'
+  const estadoGestion = CERRADAS.includes(r.estado_gestion) ? r.estado_gestion
+    : !abierto ? 'Cerrado'
     : (dd != null && dd < 0) ? 'Atrasado'
     : (r.estado_gestion || 'En seguimiento')
   // Igual que Gestion: si el dato guardado quedo viejo (por ejemplo un

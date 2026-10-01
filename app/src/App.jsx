@@ -16,7 +16,7 @@ import Login from './Login'
 import './App.css'
 
 const CAT_EST = ['Pendiente', 'Completo']
-const CAT_GES = ['En seguimiento', 'Reprogramado', 'Atrasado', 'Cerrado']
+const CAT_GES = ['En seguimiento', 'Reprogramado', 'Atrasado', 'Cerrado', 'Orden Anulada']
 
 const COLS = [
   { k: 'sem2', l: '', w: '30px' },

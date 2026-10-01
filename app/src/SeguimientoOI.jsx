@@ -120,14 +120,16 @@ export default function SeguimientoOI() {
     else { setSortK(k); setSortD(1) }
   }
 
-  function actualizarFila(id, segPatch) {
+  function actualizarFila(id, segPatch, nuevaFechaProg) {
     setRows(prev => prev.map(r => {
       if (r.id_entrega !== id) return r
       const newSeg = { ...(r.seg || {}), ...segPatch }
       const etapa = calcularEtapa(newSeg, r)
       const eta = newSeg.eta || null
       const diasEta = eta ? Math.round((new Date(eta + 'T00:00:00') - new Date()) / 864e5) : null
-      return { ...r, seg: newSeg, etapa, etapaLabel: etapaLabel(etapa), incoterm: newSeg.incoterm || '', eta, diasEta }
+      const updated = { ...r, seg: newSeg, etapa, etapaLabel: etapaLabel(etapa), incoterm: newSeg.incoterm || '', eta, diasEta }
+      if (nuevaFechaProg) updated.fecha_programada_ingreso = nuevaFechaProg
+      return updated
     }))
   }
 
@@ -242,7 +244,7 @@ export default function SeguimientoOI() {
       )}
 
       {selected && (
-        <PanelOI row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={patch => actualizarFila(selected.id_entrega, patch)} />
+        <PanelOI row={selected} esEditor={esEditor} onClose={() => setSelectedId(null)} onSaved={(patch, nuevaFechaProg) => actualizarFila(selected.id_entrega, patch, nuevaFechaProg)} />
       )}
     </>
   )
