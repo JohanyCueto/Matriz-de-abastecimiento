@@ -29,6 +29,7 @@ export default function Explosion() {
   const [fEstado, setFEstado] = useState('')
   const [soloCambios, setSoloCambios] = useState(false)
   const [soloFaltante, setSoloFaltante] = useState(false)
+  const [soloTardios, setSoloTardios] = useState(false)
   const scrollRef = useRef(null)
   const moverScroll = dir => scrollRef.current?.scrollBy({ left: dir * 360, behavior: 'smooth' })
 
@@ -49,7 +50,7 @@ export default function Explosion() {
           obtenerOcPorSku(codigos),
           obtenerIngresosPosterioresA(codigos, actual.fecha_corte),
         ])
-        setFilas(calcularCompraSugerida(comparadas, ocPorSku, ingresosPorSku))
+        setFilas(calcularCompraSugerida(comparadas, ocPorSku, ingresosPorSku, actual.fecha_corte))
       } else {
         setFilas(null)
       }
@@ -86,9 +87,10 @@ export default function Explosion() {
       if (fEstado && f.estadoAbastecimiento !== fEstado) return false
       if (soloCambios && f.categoria === 'sin_cambio') return false
       if (soloFaltante && f.faltanteReal <= 0) return false
+      if (soloTardios && !f.pedidoTardio) return false
       return true
     })
-  }, [filas, q, fGrupo, fCliente, fMesFab, fEstado, soloCambios, soloFaltante])
+  }, [filas, q, fGrupo, fCliente, fMesFab, fEstado, soloCambios, soloFaltante, soloTardios])
 
   const kpis = useMemo(() => {
     if (!filas) return null
@@ -101,13 +103,14 @@ export default function Explosion() {
       requierenCompra: filas.filter(f => f.compraSugerida > 0).length,
       enRiesgo: filas.filter(f => f.estadoAbastecimiento === 'en_riesgo').length,
       quiebre: filas.filter(f => f.estadoAbastecimiento === 'quiebre').length,
+      tardios: filas.filter(f => f.pedidoTardio).length,
     }
   }, [filas])
 
   function limpiar() {
     setQInput(''); setQ('')
     setFGrupo(''); setFCliente(''); setFMesFab(''); setFEstado('')
-    setSoloCambios(false); setSoloFaltante(false)
+    setSoloCambios(false); setSoloFaltante(false); setSoloTardios(false)
   }
 
   return (
@@ -143,6 +146,7 @@ export default function Explosion() {
             <div className="kpi r"><div className="lb">Requieren compra</div><div className="vl">{kpis.requierenCompra}</div></div>
             <div className="kpi r"><div className="lb">En riesgo</div><div className="vl">{kpis.enRiesgo}</div></div>
             <div className="kpi r"><div className="lb">Ruptura de stock</div><div className="vl">{kpis.quiebre}</div></div>
+            <div className="kpi r"><div className="lb">Pedidos tardíos</div><div className="vl">{kpis.tardios}</div></div>
           </div>
 
           <div className="bar">
@@ -165,6 +169,7 @@ export default function Explosion() {
             </select>
             <button className={`btn ${soloCambios ? 'act' : ''}`} onClick={() => setSoloCambios(v => !v)}>Solo con cambios</button>
             <button className={`btn ${soloFaltante ? 'act' : ''}`} onClick={() => setSoloFaltante(v => !v)}>Solo con faltante</button>
+            <button className={`btn ${soloTardios ? 'act' : ''}`} onClick={() => setSoloTardios(v => !v)}>Solo pedidos tardíos</button>
             <button className="btn" onClick={limpiar}>Limpiar</button>
             <span className="count">{fmt(filtradas.length)} materiales</span>
           </div>
@@ -198,6 +203,7 @@ export default function Explosion() {
                     <th>Fecha requerida</th>
                     <th>Fecha programada</th>
                     <th className="num">Cobertura</th>
+                    <th>Anticipación</th>
                     <th>Estado</th>
                   </tr>
                 </thead>
@@ -244,12 +250,19 @@ export default function Explosion() {
                             ? <span style={{ color: f.mesesCubiertos >= 2.5 ? 'var(--grn)' : f.mesesCubiertos >= 1 ? 'var(--amb)' : 'var(--red)', fontWeight: 500 }}>{f.mesesCubiertos} m</span>
                             : <span className="dim">-</span>}
                         </td>
+                        <td>
+                          {f.pedidoTardio
+                            ? <span className="tag t-quiebre">Tardío {f.diasAnticipacion}d</span>
+                            : f.diasAnticipacion != null
+                              ? <span style={{ color: f.diasAnticipacion >= 30 ? 'var(--grn)' : f.diasAnticipacion >= 15 ? 'var(--amb)' : 'var(--red)' }}>{f.diasAnticipacion}d</span>
+                              : <span className="dim">-</span>}
+                        </td>
                         <td><span className={`tag ${ESTADO_TAG[f.estadoAbastecimiento]}`}>{ESTADO_LABEL[f.estadoAbastecimiento]}</span></td>
                       </tr>
                       {expandido === f.codigo && (
                         <tr>
                           <td></td>
-                          <td colSpan={19}>
+                          <td colSpan={20}>
                             <table className="expl-detalle">
                               <thead>
                                 <tr><th>Mes</th><th className="num">Explosión anterior</th><th className="num">Nueva explosión</th><th className="num">Variación</th></tr>

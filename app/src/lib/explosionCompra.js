@@ -81,7 +81,7 @@ function mesFabricacionEfectivo(mesFabOriginal, fechaReqOriginal, meses) {
   return { mesFab: proximo.mes, fechaReq }
 }
 
-export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map()) {
+export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map(), fechaCorte = null) {
   return filas.map(f => {
     const tubo = esTubo(f.descripcion)
     const mermaPct = tubo ? MERMA_TUBO : mermaPorGrupo(f.grupo)
@@ -139,6 +139,19 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
       ? Math.round(((stock + oc.saldoPendiente) / consumoMensual) * 10) / 10
       : null
 
+    // Anticipacion: dias entre la fecha del archivo de explosion y la
+    // fecha en que el material necesitaba estar en almacen. Si es negativo,
+    // la explosion pidio algo que ya debia haber llegado → "pedido tardio":
+    // evidencia de que planeamiento/produccion lo solicito fuera de fecha.
+    let diasAnticipacion = null
+    let pedidoTardio = false
+    if (fechaCorte && fechaReq) {
+      diasAnticipacion = Math.round(
+        (new Date(fechaReq) - new Date(fechaCorte + 'T00:00:00')) / 86400000
+      )
+      pedidoTardio = diasAnticipacion < 0
+    }
+
     return {
       ...f,
       mesFabricacionProximo: mesFab,
@@ -157,6 +170,8 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
       estadoAbastecimiento,
       mesesCubiertos,
       consumoMensual,
+      diasAnticipacion,
+      pedidoTardio,
     }
   })
 }
