@@ -62,6 +62,25 @@ function necesidadHastaCobertura(meses, mesesCobertura) {
 // ya ingreso a almacen despues del corte (ingresosPorSku, sacado de
 // ingresos_sistema) para que el stock efectivo sea real, sin esperar a
 // que Johany suba una explosion mas nueva.
+// Si el mes de fabricacion mas proximo del snapshot ya paso, busca el
+// siguiente mes con consumo que aun no haya pasado y recalcula la fecha
+// requerida (dia 10 del mes anterior). Asi la tabla siempre muestra el
+// proximo mes relevante, no uno que ya quedo atras.
+function mesFabricacionEfectivo(mesFabOriginal, fechaReqOriginal, meses) {
+  if (!mesFabOriginal) return { mesFab: null, fechaReq: null }
+  const hoy = new Date()
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+  if (mesFabOriginal >= mesActual) return { mesFab: mesFabOriginal, fechaReq: fechaReqOriginal }
+  const proximo = [...meses]
+    .filter(m => m.mes >= mesActual && (m.actual || 0) > 0)
+    .sort((a, b) => a.mes.localeCompare(b.mes))[0]
+  if (!proximo) return { mesFab: mesFabOriginal, fechaReq: fechaReqOriginal }
+  const [y, mo] = proximo.mes.split('-').map(Number)
+  const req = new Date(y, mo - 2, 10)
+  const fechaReq = `${req.getFullYear()}-${String(req.getMonth() + 1).padStart(2, '0')}-${String(req.getDate()).padStart(2, '0')}`
+  return { mesFab: proximo.mes, fechaReq }
+}
+
 export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map()) {
   return filas.map(f => {
     const tubo = esTubo(f.descripcion)
@@ -72,6 +91,9 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
     const oc = ocPorSku.get(f.codigo) || { saldoPendiente: 0, fechaProgramada: null, entregas: [] }
     const ingresosPosterioresAlCorte = ingresosPorSku.get(f.codigo) || 0
     const stock = (f.stock || 0) + ingresosPosterioresAlCorte
+
+    const { mesFab, fechaReq } = mesFabricacionEfectivo(
+      f.mesFabricacionProximo, f.fechaRequeridaIngreso, f.meses)
 
     const faltanteReal = Math.max(0, necesidad - stock - oc.saldoPendiente)
     // La merma se aplica sobre lo que de verdad falta comprar, no sobre
@@ -88,26 +110,21 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
     if (faltanteReal <= 0) {
       estadoAbastecimiento = 'cubierto'
     } else if (oc.saldoPendiente > 0 && oc.fechaProgramada) {
-      // Hay OC pendiente cubriendo parte del consumo: clasificar por
-      // timing, sin importar si la fecha requerida ya paso. Antes se
-      // marcaba "quiebre" cuando la fecha pasaba, pero con una OC de
-      // 850,000 unidades cubriendo el 96% del consumo no tiene sentido
-      // llamarlo ruptura.
-      if (!f.fechaRequeridaIngreso) {
+      if (!fechaReq) {
         estadoAbastecimiento = 'sin_dato'
       } else {
         const diasDiferencia = Math.round(
-          (new Date(oc.fechaProgramada) - new Date(f.fechaRequeridaIngreso)) / 86400000
+          (new Date(oc.fechaProgramada) - new Date(fechaReq)) / 86400000
         )
         if (diasDiferencia <= 0) estadoAbastecimiento = 'a_tiempo'
         else if (diasDiferencia <= MARGEN_AJUSTADO_DIAS) estadoAbastecimiento = 'ajustado'
         else estadoAbastecimiento = 'en_riesgo'
       }
-    } else if (f.fechaRequeridaIngreso && new Date(f.fechaRequeridaIngreso) < new Date()) {
+    } else if (fechaReq && new Date(fechaReq) < new Date()) {
       estadoAbastecimiento = 'quiebre'
     } else if (!oc.fechaProgramada && oc.saldoPendiente <= 0) {
       estadoAbastecimiento = 'sin_oc'
-    } else if (!f.fechaRequeridaIngreso) {
+    } else if (!fechaReq) {
       estadoAbastecimiento = 'sin_dato'
     } else {
       estadoAbastecimiento = 'en_riesgo'
@@ -124,6 +141,8 @@ export function calcularCompraSugerida(filas, ocPorSku, ingresosPorSku = new Map
 
     return {
       ...f,
+      mesFabricacionProximo: mesFab,
+      fechaRequeridaIngreso: fechaReq,
       mermaPct,
       loteMinimoAplicado,
       mesesCobertura,
